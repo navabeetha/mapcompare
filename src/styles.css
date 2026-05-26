@@ -12,7 +12,7 @@ html, body, #root {
 
 .split-container {
   position: relative;
-  height: 100%;
+  height: calc(100vh - 56px);
   overflow: hidden;
   display: flex;
 }
@@ -22,6 +22,7 @@ html, body, #root {
   height: 100%;
   min-width: 0;
   flex: 1;
+  isolation: isolate;
 }
 
 .map-pane .leaflet-container {
@@ -67,7 +68,7 @@ html, body, #root {
   background: var(--mantine-color-blue-6);
   opacity: 0.6;
   cursor: ew-resize;
-  z-index: 600;
+  z-index: 10;
 }
 
 .splitter:hover {

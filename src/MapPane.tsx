@@ -9,6 +9,7 @@ import {
 } from '@mantine/core';
 import type { CityPreset } from './presets';
 import { createTileLayer, type MapStyle } from './tileLayers';
+import { createScaleGridLayer } from './GridLayer';
 
 type Side = 'left' | 'right';
 
@@ -21,6 +22,7 @@ interface MapPaneProps {
   side: Side;
   initialCity: CityPreset;
   city: CityPreset;
+  gridVisible: boolean;
   onReady: (handle: MapPaneHandle) => void;
   onUserZoom: (side: Side, zoom: number, lat: number) => void;
   onInteractionChange: (side: Side, interacting: boolean) => void;
@@ -37,13 +39,13 @@ interface SearchResult {
 const STYLE_OPTIONS = [
   { label: 'MAP', value: 'roadmap' },
   { label: 'SAT', value: 'satellite' },
-  { label: 'TER', value: 'terrain' },
 ];
 
 export function MapPane({
   side,
   initialCity,
   city,
+  gridVisible,
   onReady,
   onUserZoom,
   onInteractionChange,
@@ -52,7 +54,8 @@ export function MapPane({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [style, setStyle] = useState<MapStyle>('roadmap');
+  const gridLayerRef = useRef<L.GridLayer | null>(null);
+  const [style, setStyle] = useState<MapStyle>('satellite');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
 
@@ -69,7 +72,7 @@ export function MapPane({
     });
     L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo(map);
 
-    const tile = createTileLayer('roadmap').addTo(map);
+    const tile = createTileLayer('satellite').addTo(map);
     tileLayerRef.current = tile;
     mapRef.current = map;
 
@@ -104,6 +107,17 @@ export function MapPane({
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
     tileLayerRef.current = createTileLayer(style).addTo(map);
   }, [style]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (gridVisible && !gridLayerRef.current) {
+      gridLayerRef.current = createScaleGridLayer().addTo(map);
+    } else if (!gridVisible && gridLayerRef.current) {
+      map.removeLayer(gridLayerRef.current);
+      gridLayerRef.current = null;
+    }
+  }, [gridVisible]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -188,19 +202,6 @@ export function MapPane({
         </Text>
         <Text size="xs" c="dimmed">
           {city.country}
-        </Text>
-        {city.areaKm2 > 0 && (
-          <Text size="xs" c="dimmed">
-            Area: {city.areaKm2.toLocaleString()} km²
-          </Text>
-        )}
-        {city.population > 0 && (
-          <Text size="xs" c="dimmed">
-            Population: {(city.population / 1_000_000).toFixed(2)}M
-          </Text>
-        )}
-        <Text size="xs" c="dimmed" fs="italic" mt={6}>
-          {city.curio}
         </Text>
       </Paper>
     </div>

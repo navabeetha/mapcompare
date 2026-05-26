@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { AppShell, Group, Title, Button } from '@mantine/core';
+import { AppShell, Group, Title, Button, Badge, Switch, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { MapPane, type MapPaneHandle } from './MapPane';
 import { CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
+import { eyeAltitudeMeters, formatAltitude } from './altitude';
 import { AboutModal } from './AboutModal';
+
+const HEADER_HEIGHT = 56;
+const paneHeightPx = () => window.innerHeight - HEADER_HEIGHT;
 
 type Side = 'left' | 'right';
 
@@ -13,6 +17,8 @@ export default function App() {
   const [leftCity, setLeftCity] = useState<CityPreset>(CITIES.tokyo);
   const [rightCity, setRightCity] = useState<CityPreset>(CITIES.paris);
   const [splitPct, setSplitPct] = useState(50);
+  const [gridVisible, setGridVisible] = useState(false);
+  const [altitudeM, setAltitudeM] = useState<number | null>(null);
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(false);
 
   // Sync state: trigger lock + per-side interaction flags + debouncer.
@@ -25,8 +31,15 @@ export default function App() {
   const rightMapRef = useRef<L.Map | null>(null);
 
   const handleReady = useCallback((handle: MapPaneHandle) => {
-    if (handle.side === 'left') leftMapRef.current = handle.map;
-    else rightMapRef.current = handle.map;
+    if (handle.side === 'left') {
+      leftMapRef.current = handle.map;
+      // Seed the altitude badge from the left pane's initial view.
+      const z = handle.map.getZoom();
+      const lat = handle.map.getCenter().lat;
+      setAltitudeM(eyeAltitudeMeters(z, lat, paneHeightPx()));
+    } else {
+      rightMapRef.current = handle.map;
+    }
   }, []);
 
   const handleInteraction = useCallback((side: Side, interacting: boolean) => {
@@ -36,6 +49,9 @@ export default function App() {
 
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
+      // Refresh the altitude badge on every zoom event from either pane.
+      setAltitudeM(eyeAltitudeMeters(zoom, sourceLat, paneHeightPx()));
+
       if (syncTriggerRef.current && syncTriggerRef.current !== side) return;
 
       const target = side === 'left' ? rightMapRef.current : leftMapRef.current;
@@ -91,24 +107,55 @@ export default function App() {
     rightMapRef.current?.invalidateSize();
   }, [splitPct]);
 
+  // Recompute altitude on window resize since it depends on viewport height.
+  useEffect(() => {
+    function onResize() {
+      const map = leftMapRef.current;
+      if (!map) return;
+      setAltitudeM(
+        eyeAltitudeMeters(map.getZoom(), map.getCenter().lat, paneHeightPx())
+      );
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
     <AppShell header={{ height: 56 }} padding={0}>
       <AppShell.Header className="app-header">
-        <Group h="100%" px="md" justify="space-between">
-          <Title order={4}>MapCompare</Title>
-          <Button variant="default" size="sm" onClick={openAbout}>
-            About
-          </Button>
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap">
+            <Title order={4}>MapCompare</Title>
+            <Badge variant="light" color="gray" size="sm" radius="sm">
+              {altitudeM == null ? '—' : formatAltitude(altitudeM)}
+            </Badge>
+          </Group>
+          <Group gap="md" wrap="nowrap">
+            <Switch
+              size="sm"
+              checked={gridVisible}
+              onChange={(e) => setGridVisible(e.currentTarget.checked)}
+              label={
+                <Text size="xs" c="dimmed">
+                  Scale grid
+                </Text>
+              }
+            />
+            <Button variant="default" size="sm" onClick={openAbout}>
+              About
+            </Button>
+          </Group>
         </Group>
       </AppShell.Header>
 
-      <AppShell.Main h="calc(100vh - 56px)" p={0}>
+      <AppShell.Main>
         <div className="split-container" ref={splitContainerRef}>
           <div style={{ width: `${splitPct}%`, height: '100%' }}>
             <MapPane
               side="left"
               initialCity={CITIES.tokyo}
               city={leftCity}
+              gridVisible={gridVisible}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}
@@ -128,6 +175,7 @@ export default function App() {
               side="right"
               initialCity={CITIES.paris}
               city={rightCity}
+              gridVisible={gridVisible}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}

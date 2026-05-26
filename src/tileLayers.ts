@@ -1,11 +1,10 @@
 import L from 'leaflet';
 
-export type MapStyle = 'roadmap' | 'satellite' | 'terrain';
+export type MapStyle = 'roadmap' | 'satellite';
 
 export const STYLE_LABELS: Record<MapStyle, string> = {
   roadmap: 'Roadmap',
   satellite: 'Satellite',
-  terrain: 'Terrain',
 };
 
 export function createTileLayer(style: MapStyle): L.TileLayer {
@@ -18,17 +17,17 @@ export function createTileLayer(style: MapStyle): L.TileLayer {
           attribution: 'Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics',
         }
       );
-    case 'terrain':
-      return L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution:
-          'Map data: © OpenStreetMap contributors, SRTM | Tiles: © OpenTopoMap (CC-BY-SA)',
-      });
     case 'roadmap':
     default:
-      return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors',
-      });
+      // CartoDB Voyager: minimal-borders basemap with stronger road/feature contrast.
+      return L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        {
+          maxZoom: 20,
+          subdomains: 'abcd',
+          attribution:
+            '© OpenStreetMap contributors © <a href="https://carto.com/attributions">CARTO</a>',
+        }
+      );
   }
 }
