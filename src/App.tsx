@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { MapPane, type MapPaneHandle } from './MapPane';
 import { PRESETS, CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
+import { AboutModal } from './AboutModal';
 
 type Side = 'left' | 'right';
 
@@ -13,6 +14,7 @@ export default function App() {
   const [leftCity, setLeftCity] = useState<CityPreset>(preset.left);
   const [rightCity, setRightCity] = useState<CityPreset>(preset.right);
   const [splitPct, setSplitPct] = useState(50);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Sync state: trigger lock + per-side interaction flags + debouncer.
   const syncTriggerRef = useRef<Side | null>(null);
@@ -113,28 +115,22 @@ export default function App() {
             </option>
           ))}
         </select>
-        <label style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 12 }}>
-          Split: {splitPct.toFixed(0)}%
-        </label>
-        <input
-          type="range"
-          min={10}
-          max={90}
-          value={splitPct}
-          onChange={(e) => setSplitPct(parseFloat(e.target.value))}
-        />
         <div className="spacer" />
         <button
           onClick={() => {
             setLeftCity(CITIES.tokyo);
             setRightCity(CITIES.paris);
             setPresetId('sprawl');
+            setSplitPct(50);
           }}
           title="Reset to first preset"
         >
           Reset
         </button>
+        <button onClick={() => setAboutOpen(true)}>About</button>
       </div>
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
       <div
         className="split-container"

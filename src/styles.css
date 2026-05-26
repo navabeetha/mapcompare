@@ -141,6 +141,102 @@ html, body, #root {
 
 .splitter:hover, .splitter.dragging { opacity: 1; }
 
+.style-group {
+  display: inline-flex;
+  background: rgba(24, 27, 34, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+}
+
+.style-group button {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-left: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.style-group button:first-child { border-left: none; }
+.style-group button:hover { color: var(--text); }
+.style-group button.active {
+  background: var(--accent);
+  color: #0f1115;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px 28px;
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  line-height: 1.55;
+}
+
+.modal h2 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.modal h3 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--accent);
+}
+
+.modal p, .modal ul { font-size: 14px; color: var(--text); }
+.modal ul { padding-left: 20px; }
+.modal li { margin-bottom: 6px; }
+.modal code {
+  background: var(--panel-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12.5px;
+}
+
+.modal-foot {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.modal-close:hover { color: var(--text); }
+
 .splitter::after {
   content: '';
   position: absolute;

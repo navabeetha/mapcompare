@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { CityPreset } from './presets';
-import { createTileLayer, type MapStyle, STYLE_LABELS } from './tileLayers';
+import { createTileLayer, type MapStyle } from './tileLayers';
+
+const STYLE_BUTTONS: { key: MapStyle; label: string }[] = [
+  { key: 'roadmap', label: 'MAP' },
+  { key: 'satellite', label: 'SAT' },
+  { key: 'terrain', label: 'TER' },
+];
 
 type Side = 'left' | 'right';
 
@@ -144,17 +150,18 @@ export function MapPane({
             {searching ? '...' : 'Go'}
           </button>
         </form>
-        <select
-          value={style}
-          onChange={(e) => setStyle(e.target.value as MapStyle)}
-          title="Map style"
-        >
-          {(Object.keys(STYLE_LABELS) as MapStyle[]).map((s) => (
-            <option key={s} value={s}>
-              {STYLE_LABELS[s]}
-            </option>
+        <div className="style-group" role="group" aria-label="Map style">
+          {STYLE_BUTTONS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              className={style === s.key ? 'active' : ''}
+              onClick={() => setStyle(s.key)}
+            >
+              {s.label}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
       <div className="data-card">
