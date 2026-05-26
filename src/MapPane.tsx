@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import {
+  ActionIcon,
+  Paper,
+  SegmentedControl,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import type { CityPreset } from './presets';
 import { createTileLayer, type MapStyle } from './tileLayers';
-
-const STYLE_BUTTONS: { key: MapStyle; label: string }[] = [
-  { key: 'roadmap', label: 'MAP' },
-  { key: 'satellite', label: 'SAT' },
-  { key: 'terrain', label: 'TER' },
-];
 
 type Side = 'left' | 'right';
 
@@ -33,6 +34,12 @@ interface SearchResult {
   type: string;
 }
 
+const STYLE_OPTIONS = [
+  { label: 'MAP', value: 'roadmap' },
+  { label: 'SAT', value: 'satellite' },
+  { label: 'TER', value: 'terrain' },
+];
+
 export function MapPane({
   side,
   initialCity,
@@ -49,7 +56,6 @@ export function MapPane({
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
 
-  // Initialize Leaflet map once.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, {
@@ -92,7 +98,6 @@ export function MapPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply tile style changes.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -100,7 +105,6 @@ export function MapPane({
     tileLayerRef.current = createTileLayer(style).addTo(map);
   }, [style]);
 
-  // Move the map when the controlled `city` prop changes (preset / search).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -137,46 +141,62 @@ export function MapPane({
   }
 
   return (
-    <div className="map-pane" style={{ flex: 1 }}>
+    <div className="map-pane">
       <div className="pane-toolbar">
         <form onSubmit={runSearch} style={{ display: 'flex', gap: 8, flex: 1 }}>
-          <input
-            type="text"
+          <TextInput
             placeholder={`Search a place on the ${side} map...`}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            size="sm"
+            style={{ flex: 1 }}
           />
-          <button type="submit" disabled={searching}>
-            {searching ? '...' : 'Go'}
-          </button>
+          <ActionIcon
+            type="submit"
+            variant="filled"
+            size="lg"
+            loading={searching}
+            aria-label="Search"
+          >
+            →
+          </ActionIcon>
         </form>
-        <div className="style-group" role="group" aria-label="Map style">
-          {STYLE_BUTTONS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={style === s.key ? 'active' : ''}
-              onClick={() => setStyle(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={style}
+          onChange={(v) => setStyle(v as MapStyle)}
+          data={STYLE_OPTIONS}
+          size="sm"
+        />
       </div>
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
-      <div className="data-card">
-        <div className="city-name">{city.name}</div>
-        <div className="stat">{city.country}</div>
+      <Paper
+        className="data-card"
+        shadow="md"
+        p="sm"
+        radius="md"
+        withBorder
+      >
+        <Text fw={600} size="sm">
+          {city.name}
+        </Text>
+        <Text size="xs" c="dimmed">
+          {city.country}
+        </Text>
         {city.areaKm2 > 0 && (
-          <div className="stat">Area: {city.areaKm2.toLocaleString()} km²</div>
+          <Text size="xs" c="dimmed">
+            Area: {city.areaKm2.toLocaleString()} km²
+          </Text>
         )}
         {city.population > 0 && (
-          <div className="stat">
+          <Text size="xs" c="dimmed">
             Population: {(city.population / 1_000_000).toFixed(2)}M
-          </div>
+          </Text>
         )}
-        <div className="curio">{city.curio}</div>
-      </div>
+        <Text size="xs" c="dimmed" fs="italic" mt={6}>
+          {city.curio}
+        </Text>
+      </Paper>
     </div>
   );
 }
+

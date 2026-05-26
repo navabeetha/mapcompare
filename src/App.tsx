@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { AppShell, Group, Title, Select, Button } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { MapPane, type MapPaneHandle } from './MapPane';
 import { PRESETS, CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
@@ -14,7 +16,7 @@ export default function App() {
   const [leftCity, setLeftCity] = useState<CityPreset>(preset.left);
   const [rightCity, setRightCity] = useState<CityPreset>(preset.right);
   const [splitPct, setSplitPct] = useState(50);
-  const [aboutOpen, setAboutOpen] = useState(false);
+  const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(false);
 
   // Sync state: trigger lock + per-side interaction flags + debouncer.
   const syncTriggerRef = useRef<Side | null>(null);
@@ -25,7 +27,6 @@ export default function App() {
   const leftMapRef = useRef<L.Map | null>(null);
   const rightMapRef = useRef<L.Map | null>(null);
 
-  // Adopt new preset cities.
   useEffect(() => {
     setLeftCity(preset.left);
     setRightCity(preset.right);
@@ -43,7 +44,6 @@ export default function App() {
 
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
-      // If a programmatic zoom is in flight, ignore the resulting zoomend.
       if (syncTriggerRef.current && syncTriggerRef.current !== side) return;
 
       const target = side === 'left' ? rightMapRef.current : leftMapRef.current;
@@ -60,7 +60,6 @@ export default function App() {
 
         syncTriggerRef.current = side;
         target.setZoom(compensated, { animate: false });
-        // Release the trigger lock once the resulting zoomend has fired.
         window.setTimeout(() => {
           syncTriggerRef.current = null;
         }, 50);
@@ -69,7 +68,6 @@ export default function App() {
     []
   );
 
-  // Splitter drag.
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
 
@@ -84,7 +82,6 @@ export default function App() {
       if (draggingRef.current) {
         draggingRef.current = false;
         document.body.style.cursor = '';
-        // Trigger Leaflet to recalc tile coverage for the resized panes.
         leftMapRef.current?.invalidateSize();
         rightMapRef.current?.invalidateSize();
       }
@@ -97,77 +94,80 @@ export default function App() {
     };
   }, []);
 
-  // Recompute leaflet sizes on splitPct slider changes too.
   useEffect(() => {
     leftMapRef.current?.invalidateSize();
     rightMapRef.current?.invalidateSize();
   }, [splitPct]);
 
   return (
-    <div className="app">
-      <div className="toolbar">
-        <h1>🗺️ MapCompare</h1>
-        <label style={{ fontSize: 13, color: 'var(--muted)' }}>Preset:</label>
-        <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-          {PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <div className="spacer" />
-        <button
-          onClick={() => {
-            setLeftCity(CITIES.tokyo);
-            setRightCity(CITIES.paris);
-            setPresetId('sprawl');
-            setSplitPct(50);
-          }}
-          title="Reset to first preset"
-        >
-          Reset
-        </button>
-        <button onClick={() => setAboutOpen(true)}>About</button>
-      </div>
-
-      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
-
-      <div
-        className="split-container"
-        ref={splitContainerRef}
-        style={{ position: 'relative' }}
-      >
-        <div style={{ width: `${splitPct}%`, height: '100%' }}>
-          <MapPane
-            side="left"
-            initialCity={preset.left}
-            city={leftCity}
-            onReady={handleReady}
-            onUserZoom={handleUserZoom}
-            onInteractionChange={handleInteraction}
-            onSearchCity={(_, c) => setLeftCity(c)}
+    <AppShell header={{ height: 56 }} padding={0}>
+      <AppShell.Header>
+        <Group h="100%" px="md" gap="md">
+          <Title order={4}>🗺️ MapCompare</Title>
+          <Select
+            data={PRESETS.map((p) => ({ value: p.id, label: p.label }))}
+            value={presetId}
+            onChange={(v) => v && setPresetId(v)}
+            w={320}
+            allowDeselect={false}
+            size="sm"
           />
-        </div>
-        <div
-          className="splitter"
-          style={{ left: `${splitPct}%` }}
-          onMouseDown={() => {
-            draggingRef.current = true;
-            document.body.style.cursor = 'ew-resize';
-          }}
-        />
-        <div style={{ width: `${100 - splitPct}%`, height: '100%' }}>
-          <MapPane
-            side="right"
-            initialCity={preset.right}
-            city={rightCity}
-            onReady={handleReady}
-            onUserZoom={handleUserZoom}
-            onInteractionChange={handleInteraction}
-            onSearchCity={(_, c) => setRightCity(c)}
+          <Group gap="xs" ml="auto">
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => {
+                setLeftCity(CITIES.tokyo);
+                setRightCity(CITIES.paris);
+                setPresetId('sprawl');
+                setSplitPct(50);
+              }}
+            >
+              Reset
+            </Button>
+            <Button variant="default" size="sm" onClick={openAbout}>
+              About
+            </Button>
+          </Group>
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Main h="calc(100vh - 56px)" p={0}>
+        <div className="split-container" ref={splitContainerRef}>
+          <div style={{ width: `${splitPct}%`, height: '100%' }}>
+            <MapPane
+              side="left"
+              initialCity={preset.left}
+              city={leftCity}
+              onReady={handleReady}
+              onUserZoom={handleUserZoom}
+              onInteractionChange={handleInteraction}
+              onSearchCity={(_, c) => setLeftCity(c)}
+            />
+          </div>
+          <div
+            className="splitter"
+            style={{ left: `${splitPct}%` }}
+            onMouseDown={() => {
+              draggingRef.current = true;
+              document.body.style.cursor = 'ew-resize';
+            }}
           />
+          <div style={{ width: `${100 - splitPct}%`, height: '100%' }}>
+            <MapPane
+              side="right"
+              initialCity={preset.right}
+              city={rightCity}
+              onReady={handleReady}
+              onUserZoom={handleUserZoom}
+              onInteractionChange={handleInteraction}
+              onSearchCity={(_, c) => setRightCity(c)}
+            />
+          </div>
         </div>
-      </div>
-    </div>
+      </AppShell.Main>
+
+      <AboutModal opened={aboutOpened} onClose={closeAbout} />
+    </AppShell>
   );
 }
