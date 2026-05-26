@@ -14,6 +14,9 @@ import {
   persistSavedViews,
   type SavedView,
 } from './savedViews';
+import { CURATED_VIEWS } from './curatedViews';
+
+const IS_AUTHOR = import.meta.env.DEV;
 
 const HEADER_HEIGHT = 56;
 const paneHeightPx = () => window.innerHeight - HEADER_HEIGHT;
@@ -178,7 +181,9 @@ export default function App() {
   }
 
   function handleLoadView(id: string) {
-    const view = savedViews.find((v) => v.id === id);
+    const view =
+      CURATED_VIEWS.find((v) => v.id === id) ||
+      savedViews.find((v) => v.id === id);
     if (!view) return;
     // Suppress sync so the two explicit setViews don't trigger compensated
     // re-zooms that would override the saved coordinates.
@@ -196,53 +201,149 @@ export default function App() {
     persistSavedViews(next);
   }
 
+  function handleExportDrafts() {
+    if (savedViews.length === 0) return;
+    const code = JSON.stringify(savedViews, null, 2);
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        // eslint-disable-next-line no-alert
+        alert(
+          `Copied ${savedViews.length} draft(s) to clipboard.\n\n` +
+            `Paste between the brackets in src/curatedViews.ts.`
+        );
+      })
+      .catch(() => {
+        // Fallback: log to console so the value isn't lost.
+        // eslint-disable-next-line no-console
+        console.log('Drafts JSON (clipboard write failed):\n' + code);
+        // eslint-disable-next-line no-alert
+        alert('Could not copy to clipboard — JSON logged to console.');
+      });
+  }
+
   return (
     <AppShell header={{ height: 56 }} padding={0}>
       <AppShell.Header className="app-header">
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap" align="center">
-            <Title order={4}>MapCompare</Title>
-            <Button size="sm" onClick={handleSaveClick}>
-              Save
-            </Button>
-            <Menu position="bottom-start" shadow="md" width={240}>
-              <Menu.Target>
-                <Button variant="default" size="sm">
-                  Saved views
-                  {savedViews.length > 0 && ` (${savedViews.length})`}
+        <Group
+          h="100%"
+          px="md"
+          justify="space-between"
+          wrap="nowrap"
+          style={{ position: 'relative' }}
+        >
+          <Title order={4}>MapCompare</Title>
+
+          <div className="header-center">
+            {(() => {
+              const triggerCount = IS_AUTHOR
+                ? CURATED_VIEWS.length + savedViews.length
+                : CURATED_VIEWS.length;
+              const trigger = (
+                <Button
+                  variant="default"
+                  size="sm"
+                  rightSection={
+                    <span style={{ fontSize: 10, lineHeight: 1 }}>▾</span>
+                  }
+                >
+                  Comparisons
+                  {triggerCount > 0 && ` (${triggerCount})`}
                 </Button>
-              </Menu.Target>
-              <Menu.Dropdown>
-                {savedViews.length === 0 ? (
-                  <Menu.Item disabled>No saved views yet</Menu.Item>
-                ) : (
-                  savedViews.map((v) => (
-                    <Menu.Item
-                      key={v.id}
-                      onClick={() => handleLoadView(v.id)}
-                      rightSection={
-                        <Text
-                          component="span"
-                          size="xs"
-                          c="dimmed"
-                          style={{ cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteView(v.id);
-                          }}
-                          title="Delete"
-                        >
-                          ×
-                        </Text>
-                      }
-                    >
-                      {v.title}
-                    </Menu.Item>
-                  ))
-                )}
-              </Menu.Dropdown>
-            </Menu>
-          </Group>
+              );
+
+              const dropdown = (
+                <Menu.Dropdown>
+                  {IS_AUTHOR ? (
+                    <>
+                      <Menu.Label>Featured</Menu.Label>
+                      {CURATED_VIEWS.length === 0 ? (
+                        <Menu.Item disabled>No featured comparisons yet</Menu.Item>
+                      ) : (
+                        CURATED_VIEWS.map((v) => (
+                          <Menu.Item
+                            key={v.id}
+                            onClick={() => handleLoadView(v.id)}
+                          >
+                            {v.title}
+                          </Menu.Item>
+                        ))
+                      )}
+                      <Menu.Divider />
+                      <Menu.Label>Drafts (local only)</Menu.Label>
+                      {savedViews.length === 0 ? (
+                        <Menu.Item disabled>No drafts saved yet</Menu.Item>
+                      ) : (
+                        savedViews.map((v) => (
+                          <Menu.Item
+                            key={v.id}
+                            onClick={() => handleLoadView(v.id)}
+                            rightSection={
+                              <Text
+                                component="span"
+                                size="xs"
+                                c="dimmed"
+                                style={{ cursor: 'pointer' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteView(v.id);
+                                }}
+                                title="Delete"
+                              >
+                                ×
+                              </Text>
+                            }
+                          >
+                            {v.title}
+                          </Menu.Item>
+                        ))
+                      )}
+                      {savedViews.length > 0 && (
+                        <>
+                          <Menu.Divider />
+                          <Menu.Item onClick={handleExportDrafts}>
+                            Export drafts to clipboard
+                          </Menu.Item>
+                        </>
+                      )}
+                    </>
+                  ) : CURATED_VIEWS.length === 0 ? (
+                    <Menu.Item disabled>No comparisons yet</Menu.Item>
+                  ) : (
+                    CURATED_VIEWS.map((v) => (
+                      <Menu.Item
+                        key={v.id}
+                        onClick={() => handleLoadView(v.id)}
+                      >
+                        {v.title}
+                      </Menu.Item>
+                    ))
+                  )}
+                </Menu.Dropdown>
+              );
+
+              if (IS_AUTHOR) {
+                return (
+                  <Button.Group>
+                    <Menu position="bottom" shadow="md" width={260}>
+                      <Menu.Target>{trigger}</Menu.Target>
+                      {dropdown}
+                    </Menu>
+                    <Button size="sm" onClick={handleSaveClick}>
+                      Save
+                    </Button>
+                  </Button.Group>
+                );
+              }
+              return (
+                <Menu position="bottom" shadow="md" width={260}>
+                  <Menu.Target>{trigger}</Menu.Target>
+                  {dropdown}
+                </Menu>
+              );
+            })()}
+          </div>
+
           <Group gap="md" wrap="nowrap" align="center">
             <Switch
               size="sm"

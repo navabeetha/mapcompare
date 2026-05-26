@@ -6,8 +6,9 @@ See [DOCUMENTATION.md](./DOCUMENTATION.md) for the full feature spec, user stori
 
 ## Stack
 - **Vite + React + TypeScript** — static client-only build
+- **Mantine v9** — UI components
 - **Leaflet** — map rendering (MIT)
-- **OpenStreetMap / Esri / OpenTopoMap** tiles — free public tile servers
+- **CartoDB Voyager / Esri World Imagery** tiles — free public tile servers
 - **Nominatim** — free OSM-hosted geocoding for search
 
 All open source. No API keys required.
@@ -25,12 +26,38 @@ npm run build
 npm run preview
 ```
 
+## Author vs guest mode
+The Comparisons dropdown ships with a hand-curated list in
+[`src/curatedViews.ts`](./src/curatedViews.ts). Visitors of the deployed site
+can browse and load these but can't add or remove them.
+
+- **Dev mode (`npm run dev`)** — the Save button is visible, your own drafts
+  appear in a "Drafts (local only)" section of the dropdown, and an "Export
+  drafts to clipboard" action copies them as JSON ready to paste into
+  `curatedViews.ts`.
+- **Production (deployed build)** — Save button is hidden. Only the featured
+  comparisons from `curatedViews.ts` show.
+
+Authoring workflow:
+1. `npm run dev`
+2. Set up a comparison, click **Save**, give it a title
+3. Repeat for each comparison you want featured
+4. Open Comparisons → "Export drafts to clipboard"
+5. Paste the JSON between the brackets in `src/curatedViews.ts`
+6. Commit and push — the deployed site picks them up
+
+Local drafts live in `localStorage` under `mapcompare:savedViews` and are
+per-browser. They aren't part of the deployed app.
+
 ## Deploy free to GitHub Pages
 1. Push this repo to GitHub.
 2. In repo Settings → Pages, set **Source** to "GitHub Actions".
-3. Push to `main`. The `.github/workflows/deploy.yml` workflow builds and publishes `dist/` automatically.
+3. Push to `main`. The `.github/workflows/deploy.yml` workflow builds and
+   publishes `dist/` automatically. The site appears at
+   `https://<username>.github.io/<repo-name>/`.
 
-The Vite `base: './'` config produces relative asset paths so the site works under `https://<user>.github.io/<repo>/` without further config.
+The Vite `base: './'` config produces relative asset paths so the site works
+under any subpath without further config.
 
 ### Manual one-off deploy
 If you'd rather skip Actions:
@@ -41,10 +68,16 @@ npm run deploy   # uses gh-pages package to push dist/ to gh-pages branch
 ## Project layout
 ```
 src/
-  App.tsx          # top-level layout, splitter, sync controller
+  App.tsx          # top-level layout, splitter, sync controller, header
   MapPane.tsx      # one Leaflet map + per-pane toolbar (search, style)
+  AboutModal.tsx   # about dialog content
+  SaveViewModal.tsx # save-view title prompt
   scale.ts         # latitude-corrected zoom math
-  presets.ts       # curated city pairs + metadata
+  altitude.ts      # eye-altitude + meters-per-pixel helpers
+  GridLayer.ts     # scale-grid checkerboard renderer
+  presets.ts       # initial city pair (Tokyo, Paris) + metadata
+  curatedViews.ts  # featured comparisons that ship with the deployed app
+  savedViews.ts    # localStorage helpers for local drafts
   tileLayers.ts    # tile provider config
   styles.css       # app styling
 ```
