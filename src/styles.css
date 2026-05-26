@@ -4,6 +4,12 @@ html, body, #root {
   overflow: hidden;
 }
 
+.app-header {
+  background: var(--mantine-color-dark-6);
+  border-bottom: 1px solid var(--mantine-color-dark-4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
 .split-container {
   position: relative;
   height: 100%;
@@ -38,12 +44,18 @@ html, body, #root {
 
 .data-card {
   position: absolute;
-  bottom: 28px;
+  top: 58px;
   left: 10px;
   z-index: 500;
-  max-width: 280px;
+  max-width: 260px;
   backdrop-filter: blur(6px);
   background: rgba(36, 36, 36, 0.88) !important;
+}
+
+/* Vertically center the Leaflet zoom control (left pane only) */
+.map-pane .leaflet-top.leaflet-left {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .splitter {

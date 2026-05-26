@@ -1,20 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { AppShell, Group, Title, Select, Button } from '@mantine/core';
+import { AppShell, Group, Title, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { MapPane, type MapPaneHandle } from './MapPane';
-import { PRESETS, CITIES, type CityPreset } from './presets';
+import { CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
 import { AboutModal } from './AboutModal';
 
 type Side = 'left' | 'right';
 
 export default function App() {
-  const [presetId, setPresetId] = useState(PRESETS[0].id);
-  const preset = PRESETS.find((p) => p.id === presetId)!;
-
-  const [leftCity, setLeftCity] = useState<CityPreset>(preset.left);
-  const [rightCity, setRightCity] = useState<CityPreset>(preset.right);
+  const [leftCity, setLeftCity] = useState<CityPreset>(CITIES.tokyo);
+  const [rightCity, setRightCity] = useState<CityPreset>(CITIES.paris);
   const [splitPct, setSplitPct] = useState(50);
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(false);
 
@@ -26,11 +23,6 @@ export default function App() {
 
   const leftMapRef = useRef<L.Map | null>(null);
   const rightMapRef = useRef<L.Map | null>(null);
-
-  useEffect(() => {
-    setLeftCity(preset.left);
-    setRightCity(preset.right);
-  }, [preset]);
 
   const handleReady = useCallback((handle: MapPaneHandle) => {
     if (handle.side === 'left') leftMapRef.current = handle.map;
@@ -101,34 +93,12 @@ export default function App() {
 
   return (
     <AppShell header={{ height: 56 }} padding={0}>
-      <AppShell.Header>
-        <Group h="100%" px="md" gap="md">
-          <Title order={4}>🗺️ MapCompare</Title>
-          <Select
-            data={PRESETS.map((p) => ({ value: p.id, label: p.label }))}
-            value={presetId}
-            onChange={(v) => v && setPresetId(v)}
-            w={320}
-            allowDeselect={false}
-            size="sm"
-          />
-          <Group gap="xs" ml="auto">
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={() => {
-                setLeftCity(CITIES.tokyo);
-                setRightCity(CITIES.paris);
-                setPresetId('sprawl');
-                setSplitPct(50);
-              }}
-            >
-              Reset
-            </Button>
-            <Button variant="default" size="sm" onClick={openAbout}>
-              About
-            </Button>
-          </Group>
+      <AppShell.Header className="app-header">
+        <Group h="100%" px="md" justify="space-between">
+          <Title order={4}>MapCompare</Title>
+          <Button variant="default" size="sm" onClick={openAbout}>
+            About
+          </Button>
         </Group>
       </AppShell.Header>
 
@@ -137,7 +107,7 @@ export default function App() {
           <div style={{ width: `${splitPct}%`, height: '100%' }}>
             <MapPane
               side="left"
-              initialCity={preset.left}
+              initialCity={CITIES.tokyo}
               city={leftCity}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
@@ -156,7 +126,7 @@ export default function App() {
           <div style={{ width: `${100 - splitPct}%`, height: '100%' }}>
             <MapPane
               side="right"
-              initialCity={preset.right}
+              initialCity={CITIES.paris}
               city={rightCity}
               onReady={handleReady}
               onUserZoom={handleUserZoom}

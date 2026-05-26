@@ -143,29 +143,36 @@ export function MapPane({
   return (
     <div className="map-pane">
       <div className="pane-toolbar">
-        <form onSubmit={runSearch} style={{ display: 'flex', gap: 8, flex: 1 }}>
+        <form
+          onSubmit={runSearch}
+          style={{ flex: '1 1 auto', maxWidth: 400, minWidth: 0 }}
+        >
           <TextInput
             placeholder={`Search a place on the ${side} map...`}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
             size="sm"
-            style={{ flex: 1 }}
+            rightSection={
+              <ActionIcon
+                type="submit"
+                variant="filled"
+                size="sm"
+                loading={searching}
+                aria-label="Search"
+              >
+                →
+              </ActionIcon>
+            }
+            rightSectionWidth={36}
+            rightSectionPointerEvents="all"
           />
-          <ActionIcon
-            type="submit"
-            variant="filled"
-            size="lg"
-            loading={searching}
-            aria-label="Search"
-          >
-            →
-          </ActionIcon>
         </form>
         <SegmentedControl
           value={style}
           onChange={(v) => setStyle(v as MapStyle)}
           data={STYLE_OPTIONS}
           size="sm"
+          style={{ marginLeft: 'auto' }}
         />
       </div>
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
