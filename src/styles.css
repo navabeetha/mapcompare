@@ -59,6 +59,16 @@ html, body, #root {
   transform: translateY(-50%);
 }
 
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Above Leaflet's tile pane (z 200), below shadow/marker/control panes. */
+  z-index: 450;
+}
+
 .splitter {
   position: absolute;
   top: 0;

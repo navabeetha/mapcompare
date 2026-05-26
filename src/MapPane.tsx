@@ -9,7 +9,7 @@ import {
 } from '@mantine/core';
 import type { CityPreset } from './presets';
 import { createTileLayer, type MapStyle } from './tileLayers';
-import { createScaleGridLayer } from './GridLayer';
+import { drawScaleGrid } from './GridLayer';
 
 type Side = 'left' | 'right';
 
@@ -23,6 +23,7 @@ interface MapPaneProps {
   initialCity: CityPreset;
   city: CityPreset;
   gridVisible: boolean;
+  gridStepPx: number;
   onReady: (handle: MapPaneHandle) => void;
   onUserZoom: (side: Side, zoom: number, lat: number) => void;
   onInteractionChange: (side: Side, interacting: boolean) => void;
@@ -46,6 +47,7 @@ export function MapPane({
   initialCity,
   city,
   gridVisible,
+  gridStepPx,
   onReady,
   onUserZoom,
   onInteractionChange,
@@ -54,7 +56,7 @@ export function MapPane({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const gridLayerRef = useRef<L.GridLayer | null>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<MapStyle>('satellite');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -109,15 +111,19 @@ export function MapPane({
   }, [style]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (gridVisible && !gridLayerRef.current) {
-      gridLayerRef.current = createScaleGridLayer().addTo(map);
-    } else if (!gridVisible && gridLayerRef.current) {
-      map.removeLayer(gridLayerRef.current);
-      gridLayerRef.current = null;
-    }
-  }, [gridVisible]);
+    const canvas = gridCanvasRef.current;
+    if (!canvas || !gridVisible) return;
+
+    const redraw = () => drawScaleGrid(canvas, gridStepPx);
+
+    // ResizeObserver fires once on observe (covering the initial draw, when
+    // useEffect can otherwise run before the canvas has layout dimensions)
+    // and again on any size change (splitter drag, window resize).
+    const observer = new ResizeObserver(redraw);
+    observer.observe(canvas);
+
+    return () => observer.disconnect();
+  }, [gridVisible, gridStepPx]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -190,6 +196,13 @@ export function MapPane({
         />
       </div>
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+      {gridVisible && (
+        <canvas
+          ref={gridCanvasRef}
+          className="grid-overlay"
+          aria-hidden="true"
+        />
+      )}
       <Paper
         className="data-card"
         shadow="md"

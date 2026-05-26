@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { AppShell, Group, Title, Button, Badge, Switch, Text } from '@mantine/core';
+import { AppShell, Group, Title, Button, Badge, Switch } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { MapPane, type MapPaneHandle } from './MapPane';
 import { CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
 import { eyeAltitudeMeters, formatAltitude } from './altitude';
+import { computeGridStepPx } from './GridLayer';
 import { AboutModal } from './AboutModal';
 
 const HEADER_HEIGHT = 56;
@@ -18,6 +19,7 @@ export default function App() {
   const [rightCity, setRightCity] = useState<CityPreset>(CITIES.paris);
   const [splitPct, setSplitPct] = useState(50);
   const [gridVisible, setGridVisible] = useState(false);
+  const [gridStepPx, setGridStepPx] = useState(100);
   const [altitudeM, setAltitudeM] = useState<number | null>(null);
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(false);
 
@@ -33,10 +35,11 @@ export default function App() {
   const handleReady = useCallback((handle: MapPaneHandle) => {
     if (handle.side === 'left') {
       leftMapRef.current = handle.map;
-      // Seed the altitude badge from the left pane's initial view.
+      // Seed altitude + grid step from the left pane's initial view.
       const z = handle.map.getZoom();
       const lat = handle.map.getCenter().lat;
       setAltitudeM(eyeAltitudeMeters(z, lat, paneHeightPx()));
+      setGridStepPx(computeGridStepPx(z, lat));
     } else {
       rightMapRef.current = handle.map;
     }
@@ -49,8 +52,9 @@ export default function App() {
 
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
-      // Refresh the altitude badge on every zoom event from either pane.
+      // Refresh altitude + grid step on every zoom from either pane.
       setAltitudeM(eyeAltitudeMeters(zoom, sourceLat, paneHeightPx()));
+      setGridStepPx(computeGridStepPx(zoom, sourceLat));
 
       if (syncTriggerRef.current && syncTriggerRef.current !== side) return;
 
@@ -124,23 +128,23 @@ export default function App() {
     <AppShell header={{ height: 56 }} padding={0}>
       <AppShell.Header className="app-header">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Title order={4}>MapCompare</Title>
-            <Badge variant="light" color="gray" size="sm" radius="sm">
-              {altitudeM == null ? '—' : formatAltitude(altitudeM)}
-            </Badge>
-          </Group>
-          <Group gap="md" wrap="nowrap">
+          <Title order={4}>MapCompare</Title>
+          <Group gap="md" wrap="nowrap" align="center">
             <Switch
               size="sm"
               checked={gridVisible}
               onChange={(e) => setGridVisible(e.currentTarget.checked)}
-              label={
-                <Text size="xs" c="dimmed">
-                  Scale grid
-                </Text>
-              }
+              label="Scale grid"
+              labelPosition="left"
+              styles={{
+                body: { alignItems: 'center' },
+                labelWrapper: { display: 'flex', alignItems: 'center' },
+                label: { fontSize: 12, color: 'var(--mantine-color-dimmed)' },
+              }}
             />
+            <Badge variant="light" color="gray" size="sm" radius="sm">
+              Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
+            </Badge>
             <Button variant="default" size="sm" onClick={openAbout}>
               About
             </Button>
@@ -156,6 +160,7 @@ export default function App() {
               initialCity={CITIES.tokyo}
               city={leftCity}
               gridVisible={gridVisible}
+              gridStepPx={gridStepPx}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}
@@ -176,6 +181,7 @@ export default function App() {
               initialCity={CITIES.paris}
               city={rightCity}
               gridVisible={gridVisible}
+              gridStepPx={gridStepPx}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}

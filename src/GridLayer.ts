@@ -1,8 +1,7 @@
-import L from 'leaflet';
+import { metersPerPixel } from './altitude';
 
-const EARTH_CIRCUMFERENCE_M = 40_075_016.686;
-const TILE_SIZE_PX = 256;
 const TARGET_PX_SPACING = 100;
+const CHECKER_ALPHA = 0.18;
 
 function niceNumber(value: number): number {
   if (value <= 0) return 1;
@@ -16,64 +15,57 @@ function niceNumber(value: number): number {
   return nice * Math.pow(10, exp);
 }
 
-class ScaleGridLayer extends L.GridLayer {
-  constructor() {
-    super({ pane: 'overlayPane' });
-  }
-
-  createTile(coords: L.Coords): HTMLElement {
-    const canvas = document.createElement('canvas');
-    const tileSize = this.getTileSize();
-    canvas.width = tileSize.x;
-    canvas.height = tileSize.y;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return canvas;
-
-    // Get the map this layer is attached to (internal Leaflet field).
-    const map = (this as unknown as { _map: L.Map | null })._map;
-    if (!map) return canvas;
-
-    // World-pixel position of this tile's top-left corner at coords.z.
-    const tileWorldNw = coords.scaleBy(tileSize);
-    const nwLatLng = map.unproject(tileWorldNw, coords.z);
-    const seLatLng = map.unproject(tileWorldNw.add(tileSize), coords.z);
-    const centerLat = (nwLatLng.lat + seLatLng.lat) / 2;
-
-    const mPerPx =
-      (Math.cos((centerLat * Math.PI) / 180) * EARTH_CIRCUMFERENCE_M) /
-      (TILE_SIZE_PX * Math.pow(2, coords.z));
-
-    const targetMeters = mPerPx * TARGET_PX_SPACING;
-    const stepMeters = niceNumber(targetMeters);
-    const stepPx = stepMeters / mPerPx;
-    if (!isFinite(stepPx) || stepPx <= 0) return canvas;
-
-    // Align the first lines to world-pixel multiples of stepPx so adjacent
-    // tiles' lines connect seamlessly.
-    const firstX = Math.ceil(tileWorldNw.x / stepPx) * stepPx - tileWorldNw.x;
-    const firstY = Math.ceil(tileWorldNw.y / stepPx) * stepPx - tileWorldNw.y;
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-
-    for (let x = firstX; x < tileSize.x; x += stepPx) {
-      const px = Math.round(x) + 0.5;
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, tileSize.y);
-    }
-    for (let y = firstY; y < tileSize.y; y += stepPx) {
-      const py = Math.round(y) + 0.5;
-      ctx.moveTo(0, py);
-      ctx.lineTo(tileSize.x, py);
-    }
-
-    ctx.stroke();
-    return canvas;
-  }
+/**
+ * Single source of truth for the on-screen grid cell size. Computed once
+ * (from a canonical zoom+lat, normally the left pane's) and reused on both
+ * panes so the two checkerboards always match exactly.
+ */
+export function computeGridStepPx(zoom: number, latitudeDeg: number): number {
+  const mPerPx = metersPerPixel(zoom, latitudeDeg);
+  if (!isFinite(mPerPx) || mPerPx <= 0) return 100;
+  const stepMeters = niceNumber(mPerPx * TARGET_PX_SPACING);
+  return stepMeters / mPerPx;
 }
 
-export function createScaleGridLayer(): L.GridLayer {
-  return new ScaleGridLayer();
+/**
+ * Draws a checkerboard over the canvas, anchored at the pane center. "Light"
+ * cells (where col+row is even) get a faint white fill; "dark" cells stay
+ * transparent so the map shows through.
+ */
+export function drawScaleGrid(canvas: HTMLCanvasElement, stepPx: number): void {
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  if (cssWidth === 0 || cssHeight === 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== cssWidth * dpr || canvas.height !== cssHeight * dpr) {
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  if (!isFinite(stepPx) || stepPx <= 0) return;
+
+  const cx = cssWidth / 2;
+  const cy = cssHeight / 2;
+
+  const minCol = Math.floor((0 - cx) / stepPx);
+  const maxCol = Math.ceil((cssWidth - cx) / stepPx);
+  const minRow = Math.floor((0 - cy) / stepPx);
+  const maxRow = Math.ceil((cssHeight - cy) / stepPx);
+
+  ctx.fillStyle = `rgba(255, 255, 255, ${CHECKER_ALPHA})`;
+
+  for (let col = minCol; col < maxCol; col++) {
+    for (let row = minRow; row < maxRow; row++) {
+      if (((col + row) & 1) !== 0) continue;
+      const x = cx + col * stepPx;
+      const y = cy + row * stepPx;
+      ctx.fillRect(x, y, stepPx, stepPx);
+    }
+  }
 }
