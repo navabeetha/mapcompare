@@ -24,6 +24,8 @@ interface MapPaneProps {
   city: CityPreset;
   gridVisible: boolean;
   gridStepPx: number;
+  query: string;
+  onQueryChange: (query: string) => void;
   onReady: (handle: MapPaneHandle) => void;
   onUserZoom: (side: Side, zoom: number, lat: number) => void;
   onInteractionChange: (side: Side, interacting: boolean) => void;
@@ -48,6 +50,8 @@ export function MapPane({
   city,
   gridVisible,
   gridStepPx,
+  query,
+  onQueryChange,
   onReady,
   onUserZoom,
   onInteractionChange,
@@ -58,7 +62,6 @@ export function MapPane({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<MapStyle>('satellite');
-  const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -128,7 +131,7 @@ export function MapPane({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setView([city.lat, city.lng], city.zoom, { animate: true });
+    map.setView([city.lat, city.lng], city.zoom, { animate: false });
   }, [city]);
 
   async function runSearch(e: React.FormEvent) {
@@ -170,7 +173,7 @@ export function MapPane({
           <TextInput
             placeholder={`Search a place on the ${side} map...`}
             value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
+            onChange={(e) => onQueryChange(e.currentTarget.value)}
             size="sm"
             rightSection={
               <ActionIcon
