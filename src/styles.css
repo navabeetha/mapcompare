@@ -1,0 +1,155 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b22;
+  --panel-2: #20242d;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #9aa3b2;
+  --accent: #4f9cf9;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.toolbar h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.toolbar .spacer { flex: 1; }
+
+.toolbar select,
+.toolbar input,
+.toolbar button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.toolbar button { cursor: pointer; }
+.toolbar button:hover { border-color: var(--accent); }
+
+.split-container {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.map-pane {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+}
+
+.map-pane .leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #1a1d24;
+}
+
+.pane-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 500;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+.pane-toolbar > * { pointer-events: auto; }
+
+.pane-toolbar input,
+.pane-toolbar select,
+.pane-toolbar button {
+  background: rgba(24, 27, 34, 0.92);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  backdrop-filter: blur(6px);
+}
+
+.pane-toolbar input { flex: 1; min-width: 0; }
+.pane-toolbar button { cursor: pointer; white-space: nowrap; }
+
+.data-card {
+  position: absolute;
+  bottom: 28px;
+  left: 10px;
+  z-index: 500;
+  background: rgba(24, 27, 34, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  max-width: 280px;
+  backdrop-filter: blur(6px);
+}
+
+.data-card .city-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.data-card .stat { color: var(--muted); margin-top: 2px; }
+.data-card .curio { margin-top: 6px; font-style: italic; color: var(--muted); }
+
+.splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  margin-left: -3px;
+  background: var(--accent);
+  opacity: 0.6;
+  cursor: ew-resize;
+  z-index: 600;
+}
+
+.splitter:hover, .splitter.dragging { opacity: 1; }
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -7px;
+  width: 20px;
+  height: 40px;
+  margin-top: -20px;
+  background: var(--accent);
+  border-radius: 4px;
+  opacity: 0.85;
+}
