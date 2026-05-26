@@ -22,9 +22,6 @@ export function loadSavedViews(): SavedView[] {
 }
 
 export function persistSavedViews(views: SavedView[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
-  } catch {
-    // Quota exceeded or storage disabled — fail silently.
-  }
+  // Throws on quota-exceeded or storage-disabled; callers surface the error.
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
 }

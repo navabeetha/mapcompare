@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { AppShell, Group, Title, Button, Badge, Switch, Menu, Text } from '@mantine/core';
+import { AppShell, Group, Title, Button, Badge, Switch } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import { MapPane, type MapPaneHandle } from './MapPane';
 import { CITIES, type CityPreset } from './presets';
 import { compensatedZoom } from './scale';
@@ -9,6 +10,7 @@ import { eyeAltitudeMeters, formatAltitude } from './altitude';
 import { computeGridStepPx } from './GridLayer';
 import { AboutModal } from './AboutModal';
 import { SaveViewModal } from './SaveViewModal';
+import { ExploreModal } from './ExploreModal';
 import {
   loadSavedViews,
   persistSavedViews,
@@ -34,6 +36,7 @@ export default function App() {
   const [altitudeM, setAltitudeM] = useState<number | null>(null);
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(false);
   const [saveOpened, { open: openSave, close: closeSave }] = useDisclosure(false);
+  const [exploreOpened, { open: openExplore, close: closeExplore }] = useDisclosure(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => loadSavedViews());
   const [pendingTitle, setPendingTitle] = useState('');
 
@@ -50,7 +53,6 @@ export default function App() {
   const handleReady = useCallback((handle: MapPaneHandle) => {
     if (handle.side === 'left') {
       leftMapRef.current = handle.map;
-      // Seed altitude + grid step from the left pane's initial view.
       const z = handle.map.getZoom();
       const lat = handle.map.getCenter().lat;
       setAltitudeM(eyeAltitudeMeters(z, lat, paneHeightPx()));
@@ -67,11 +69,9 @@ export default function App() {
 
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
-      // Refresh altitude + grid step on every zoom from either pane.
       setAltitudeM(eyeAltitudeMeters(zoom, sourceLat, paneHeightPx()));
       setGridStepPx(computeGridStepPx(zoom, sourceLat));
 
-      // While loading a saved view we set both panes explicitly — skip sync.
       if (suppressSyncRef.current) return;
       if (syncTriggerRef.current && syncTriggerRef.current !== side) return;
 
@@ -128,7 +128,6 @@ export default function App() {
     rightMapRef.current?.invalidateSize();
   }, [splitPct]);
 
-  // Recompute altitude on window resize since it depends on viewport height.
   useEffect(() => {
     function onResize() {
       const map = leftMapRef.current;
@@ -153,31 +152,49 @@ export default function App() {
     const rightMap = rightMapRef.current;
     if (!leftMap || !rightMap) return;
 
-    const view: SavedView = {
-      id:
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      title,
-      left: {
-        ...leftCity,
-        lat: leftMap.getCenter().lat,
-        lng: leftMap.getCenter().lng,
-        zoom: leftMap.getZoom(),
-      },
-      right: {
-        ...rightCity,
-        lat: rightMap.getCenter().lat,
-        lng: rightMap.getCenter().lng,
-        zoom: rightMap.getZoom(),
-      },
-      createdAt: Date.now(),
-    };
-
-    const next = [view, ...savedViews];
-    setSavedViews(next);
-    persistSavedViews(next);
     closeSave();
+
+    try {
+      const view: SavedView = {
+        id:
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        title,
+        left: {
+          ...leftCity,
+          lat: leftMap.getCenter().lat,
+          lng: leftMap.getCenter().lng,
+          zoom: leftMap.getZoom(),
+        },
+        right: {
+          ...rightCity,
+          lat: rightMap.getCenter().lat,
+          lng: rightMap.getCenter().lng,
+          zoom: rightMap.getZoom(),
+        },
+        createdAt: Date.now(),
+      };
+
+      const next = [view, ...savedViews];
+      setSavedViews(next);
+      persistSavedViews(next);
+
+      notifications.show({
+        title: 'Draft saved',
+        message: `"${title}" added to your drafts.`,
+        color: 'green',
+      });
+    } catch (err) {
+      notifications.show({
+        title: 'Save failed',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Could not write to local storage.',
+        color: 'red',
+      });
+    }
   }
 
   function handleLoadView(id: string) {
@@ -185,8 +202,6 @@ export default function App() {
       CURATED_VIEWS.find((v) => v.id === id) ||
       savedViews.find((v) => v.id === id);
     if (!view) return;
-    // Suppress sync so the two explicit setViews don't trigger compensated
-    // re-zooms that would override the saved coordinates.
     suppressSyncRef.current = true;
     setLeftCity(view.left);
     setRightCity(view.right);
@@ -198,7 +213,18 @@ export default function App() {
   function handleDeleteView(id: string) {
     const next = savedViews.filter((v) => v.id !== id);
     setSavedViews(next);
-    persistSavedViews(next);
+    try {
+      persistSavedViews(next);
+    } catch (err) {
+      notifications.show({
+        title: 'Delete failed',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Could not update local storage.',
+        color: 'red',
+      });
+    }
   }
 
   function handleExportDrafts() {
@@ -207,143 +233,38 @@ export default function App() {
     navigator.clipboard
       .writeText(code)
       .then(() => {
-        // eslint-disable-next-line no-alert
-        alert(
-          `Copied ${savedViews.length} draft(s) to clipboard.\n\n` +
-            `Paste between the brackets in src/curatedViews.ts.`
-        );
+        notifications.show({
+          title: 'Copied to clipboard',
+          message: `${savedViews.length} draft(s) — paste into src/curatedViews.ts`,
+          color: 'blue',
+        });
       })
       .catch(() => {
-        // Fallback: log to console so the value isn't lost.
         // eslint-disable-next-line no-console
         console.log('Drafts JSON (clipboard write failed):\n' + code);
-        // eslint-disable-next-line no-alert
-        alert('Could not copy to clipboard — JSON logged to console.');
+        notifications.show({
+          title: 'Copy failed',
+          message: 'JSON logged to the browser console instead.',
+          color: 'red',
+        });
       });
   }
 
   return (
-    <AppShell header={{ height: 56 }} padding={0}>
+    <AppShell header={{ height: HEADER_HEIGHT }} padding={0}>
       <AppShell.Header className="app-header">
-        <Group
-          h="100%"
-          px="md"
-          justify="space-between"
-          wrap="nowrap"
-          style={{ position: 'relative' }}
-        >
-          <Title order={4}>MapCompare</Title>
-
-          <div className="header-center">
-            {(() => {
-              const triggerCount = IS_AUTHOR
-                ? CURATED_VIEWS.length + savedViews.length
-                : CURATED_VIEWS.length;
-              const trigger = (
-                <Button
-                  variant="default"
-                  size="sm"
-                  rightSection={
-                    <span style={{ fontSize: 10, lineHeight: 1 }}>▾</span>
-                  }
-                >
-                  Comparisons
-                  {triggerCount > 0 && ` (${triggerCount})`}
-                </Button>
-              );
-
-              const dropdown = (
-                <Menu.Dropdown>
-                  {IS_AUTHOR ? (
-                    <>
-                      <Menu.Label>Featured</Menu.Label>
-                      {CURATED_VIEWS.length === 0 ? (
-                        <Menu.Item disabled>No featured comparisons yet</Menu.Item>
-                      ) : (
-                        CURATED_VIEWS.map((v) => (
-                          <Menu.Item
-                            key={v.id}
-                            onClick={() => handleLoadView(v.id)}
-                          >
-                            {v.title}
-                          </Menu.Item>
-                        ))
-                      )}
-                      <Menu.Divider />
-                      <Menu.Label>Drafts (local only)</Menu.Label>
-                      {savedViews.length === 0 ? (
-                        <Menu.Item disabled>No drafts saved yet</Menu.Item>
-                      ) : (
-                        savedViews.map((v) => (
-                          <Menu.Item
-                            key={v.id}
-                            onClick={() => handleLoadView(v.id)}
-                            rightSection={
-                              <Text
-                                component="span"
-                                size="xs"
-                                c="dimmed"
-                                style={{ cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteView(v.id);
-                                }}
-                                title="Delete"
-                              >
-                                ×
-                              </Text>
-                            }
-                          >
-                            {v.title}
-                          </Menu.Item>
-                        ))
-                      )}
-                      {savedViews.length > 0 && (
-                        <>
-                          <Menu.Divider />
-                          <Menu.Item onClick={handleExportDrafts}>
-                            Export drafts to clipboard
-                          </Menu.Item>
-                        </>
-                      )}
-                    </>
-                  ) : CURATED_VIEWS.length === 0 ? (
-                    <Menu.Item disabled>No comparisons yet</Menu.Item>
-                  ) : (
-                    CURATED_VIEWS.map((v) => (
-                      <Menu.Item
-                        key={v.id}
-                        onClick={() => handleLoadView(v.id)}
-                      >
-                        {v.title}
-                      </Menu.Item>
-                    ))
-                  )}
-                </Menu.Dropdown>
-              );
-
-              if (IS_AUTHOR) {
-                return (
-                  <Button.Group>
-                    <Menu position="bottom" shadow="md" width={260}>
-                      <Menu.Target>{trigger}</Menu.Target>
-                      {dropdown}
-                    </Menu>
-                    <Button size="sm" onClick={handleSaveClick}>
-                      Save
-                    </Button>
-                  </Button.Group>
-                );
-              }
-              return (
-                <Menu position="bottom" shadow="md" width={260}>
-                  <Menu.Target>{trigger}</Menu.Target>
-                  {dropdown}
-                </Menu>
-              );
-            })()}
-          </div>
-
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap" align="center">
+            <Title order={4}>MapCompare</Title>
+            <Button size="sm" onClick={openExplore}>
+              Explore
+            </Button>
+            {IS_AUTHOR && (
+              <Button variant="default" size="sm" onClick={handleSaveClick}>
+                Save
+              </Button>
+            )}
+          </Group>
           <Group gap="md" wrap="nowrap" align="center">
             <Switch
               size="sm"
@@ -416,6 +337,16 @@ export default function App() {
         defaultTitle={pendingTitle}
         onSave={handleConfirmSave}
         onClose={closeSave}
+      />
+      <ExploreModal
+        opened={exploreOpened}
+        onClose={closeExplore}
+        isAuthor={IS_AUTHOR}
+        curatedViews={CURATED_VIEWS}
+        draftViews={savedViews}
+        onLoad={handleLoadView}
+        onDeleteDraft={handleDeleteView}
+        onExportDrafts={handleExportDrafts}
       />
     </AppShell>
   );
