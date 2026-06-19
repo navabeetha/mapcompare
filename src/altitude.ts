@@ -26,6 +26,15 @@ export function eyeAltitudeMeters(
   return (viewportHeightPx * mPerPx) / (2 * Math.tan(fovRad / 2));
 }
 
+/** Compact ground-distance label, e.g. "850 m", "1.2 km", "37 km". */
+export function formatDistance(meters: number): string {
+  if (!isFinite(meters) || meters < 0) return '—';
+  if (meters < 1_000) return `${Math.round(meters)} m`;
+  if (meters < 10_000) return `${(meters / 1_000).toFixed(2)} km`;
+  if (meters < 100_000) return `${(meters / 1_000).toFixed(1)} km`;
+  return `${Math.round(meters / 1_000).toLocaleString()} km`;
+}
+
 export function formatAltitude(meters: number): string {
   if (!isFinite(meters) || meters <= 0) return '—';
   if (meters < 1_000) return `${Math.round(meters)} m`;

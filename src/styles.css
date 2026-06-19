@@ -81,6 +81,16 @@ html, body, #root {
   z-index: 450;
 }
 
+.measure-panel {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  backdrop-filter: blur(6px);
+  background: rgba(36, 36, 36, 0.9) !important;
+}
+
 .splitter {
   position: absolute;
   top: 0;

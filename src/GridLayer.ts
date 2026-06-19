@@ -18,13 +18,23 @@ function niceNumber(value: number): number {
 /**
  * Single source of truth for the on-screen grid cell size. Computed once
  * (from a canonical zoom+lat, normally the left pane's) and reused on both
- * panes so the two checkerboards always match exactly.
+ * panes so the two checkerboards always match exactly. Returns both the
+ * on-screen pixel size and the ground distance (meters) it represents.
  */
-export function computeGridStepPx(zoom: number, latitudeDeg: number): number {
+export function computeGridStep(
+  zoom: number,
+  latitudeDeg: number
+): { stepPx: number; stepMeters: number } {
   const mPerPx = metersPerPixel(zoom, latitudeDeg);
-  if (!isFinite(mPerPx) || mPerPx <= 0) return 100;
+  if (!isFinite(mPerPx) || mPerPx <= 0) {
+    return { stepPx: 100, stepMeters: 100 };
+  }
   const stepMeters = niceNumber(mPerPx * TARGET_PX_SPACING);
-  return stepMeters / mPerPx;
+  return { stepPx: stepMeters / mPerPx, stepMeters };
+}
+
+export function computeGridStepPx(zoom: number, latitudeDeg: number): number {
+  return computeGridStep(zoom, latitudeDeg).stepPx;
 }
 
 /**
