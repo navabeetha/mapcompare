@@ -2,13 +2,189 @@ import type { SavedView } from './savedViews';
 
 /**
  * Hand-curated comparisons that ship with the deployed app. Visitors see
- * these in the Comparisons dropdown but can't add to or remove from them.
+ * these in the Explore dropdown but can't add to or remove from them.
  *
  * Authoring workflow:
  *   1. `npm run dev`
  *   2. Pan/zoom each pane to set up a comparison, then click Save
- *   3. Open Comparisons → "Export drafts to clipboard"
+ *   3. Open Explore → "Export drafts to clipboard"
  *   4. Paste the JSON between the brackets below
  *   5. Commit and push — the deploy workflow ships it
  */
-export const CURATED_VIEWS: SavedView[] = [];
+export const CURATED_VIEWS: SavedView[] = [
+  {
+    id: 'b70081ca-b4e7-4c03-9c74-08fc5d33bc81',
+    title: 'amsterdam vs venice',
+    left: {
+      name: 'Amsterdam',
+      country: 'Netherlands',
+      lat: 52.370197165106504,
+      lng: 4.903457370003217,
+      zoom: 13.5,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Amsterdam, North Holland, Netherlands',
+    },
+    right: {
+      name: 'Venice',
+      country: 'Italy',
+      lat: 45.43515671589556,
+      lng: 12.336685658707333,
+      zoom: 13.75,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Venice, Venezia, Veneto, 30121-30176, Italy',
+    },
+    createdAt: 1779822515627,
+  },
+  {
+    id: '08af7981-5b0f-477d-8891-201e0ff10b44',
+    title: 'istanbul vs panama city',
+    left: {
+      name: 'Istanbul',
+      country: 'Turkey',
+      lat: 41.10341770143104,
+      lng: 29.06417589687994,
+      zoom: 10.25,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Istanbul, Turkey',
+    },
+    right: {
+      name: 'Panama City',
+      country: 'Panama',
+      lat: 9.157674882421034,
+      lng: -79.72515820579208,
+      zoom: 10.75,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Panama City, Calidonia, Distrito de Panamá, Panamá Province, 0843, Panama',
+    },
+    createdAt: 1779820942051,
+  },
+  {
+    id: '0c24fe2d-e752-424e-8404-120345bdbc36',
+    title: 'tokyo bay vs paris',
+    left: {
+      name: 'Tokyo',
+      country: 'Japan',
+      lat: 35.608932774169475,
+      lng: 139.89547033912626,
+      zoom: 11.5,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Tokyo, Japan',
+    },
+    right: {
+      name: 'Paris',
+      country: 'France',
+      lat: 48.876443297563554,
+      lng: 2.3283506628732824,
+      zoom: 11.25,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Paris, Ile-de-France, Metropolitan France, France',
+    },
+    createdAt: 1779819044085,
+  },
+  {
+    id: 'cf8041be-f30f-463f-924c-fac99092d1e3',
+    title: 'new york vs mumbai',
+    left: {
+      name: 'New York',
+      country: 'United States',
+      lat: 40.781695591050024,
+      lng: -73.87774538270166,
+      zoom: 10.75,
+      areaKm2: 0,
+      population: 0,
+      curio: 'New York, United States',
+    },
+    right: {
+      name: 'Mumbai',
+      country: 'India',
+      lat: 19.014734606492876,
+      lng: 73.05084228515626,
+      zoom: 11,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Mumbai, Mumbai Suburban District, Maharashtra, 400051, India',
+    },
+    createdAt: 1779818943232,
+  },
+  {
+    id: '797cdda4-f5a1-4c09-a56d-217f4ae737f7',
+    title: 'hong kong vs singapore',
+    left: {
+      name: 'Hong Kong',
+      country: 'China',
+      lat: 22.41483717937219,
+      lng: 114.12254333496095,
+      zoom: 11,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Hong Kong, China',
+    },
+    right: {
+      name: 'Singapore',
+      country: 'Singapore',
+      lat: 1.2914708266088921,
+      lng: 103.83247375488281,
+      zoom: 11,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Singapore',
+    },
+    createdAt: 1779818854827,
+  },
+  {
+    id: 'd726a724-4e15-4f37-80c2-cd8c66c2a954',
+    title: 'amazon vs sunderbans',
+    left: {
+      name: 'Manaus',
+      country: 'Brazil',
+      lat: -0.3381222637092752,
+      lng: -49.63668206076286,
+      zoom: 8.5,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Manaus, Amazonas, North Region, 69000-000, Brazil',
+    },
+    right: {
+      name: 'Dhaka',
+      country: 'Bangladesh',
+      lat: 23.383495347878394,
+      lng: 89.77870369159027,
+      zoom: 8.25,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Dhaka, Dhaka Metropolitan, Dhaka District, Dhaka Division, 1215, Bangladesh',
+    },
+    createdAt: 1779818805748,
+  },
+  {
+    id: 'ac8a776a-2f31-4fd0-9fe1-3ccfb70c1280',
+    title: 'nicobar vs mumbai',
+    left: {
+      name: 'Nicobar',
+      country: 'India',
+      lat: 7.062430827475277,
+      lng: 93.56517860518683,
+      zoom: 10.75,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Nicobar, Andaman and Nicobar Islands, India',
+    },
+    right: {
+      name: 'Mumbai',
+      country: 'India',
+      lat: 19.17450759895721,
+      lng: 73.1470027021879,
+      zoom: 10.75,
+      areaKm2: 0,
+      population: 0,
+      curio: 'Mumbai, Mumbai Suburban District, Maharashtra, 400051, India',
+    },
+    createdAt: 1779818384125,
+  },
+];
