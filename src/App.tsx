@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import L from 'leaflet';
 import {
   AppShell,
@@ -16,7 +17,15 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { MdStraighten, MdClose } from 'react-icons/md';
+import {
+  MdClose,
+  MdCompareArrows,
+  MdDeleteOutline,
+  MdOpenWith,
+  MdPentagon,
+  MdPolyline,
+  MdRadioButtonUnchecked,
+} from 'react-icons/md';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { MapPane, type MapPaneHandle } from './MapPane';
@@ -29,37 +38,105 @@ import {
   metersPerPixel,
 } from './altitude';
 import { computeGridStep } from './GridLayer';
+import { formatArea } from './geometry';
+import {
+  measureShape,
+  mirrorShape,
+  type MeasureShape,
+  type ShapeMode,
+} from './shapes';
 import { AboutModal } from './AboutModal';
 import { SaveViewModal } from './SaveViewModal';
 import { ExploreMenu } from './ExploreMenu';
 import {
-  loadSavedViews,
-  persistSavedViews,
-  type SavedView,
-} from './savedViews';
+  createProjectId,
+  loadProjects,
+  migrateProjects,
+  persistProjects,
+  SCHEMA_VERSION,
+  type Project,
+} from './projects';
 import { CURATED_VIEWS } from './curatedViews';
+import type { AppMode } from './mode';
+import type { MapStyle } from './tileLayers';
 
-const IS_AUTHOR = import.meta.env.DEV;
+/**
+ * The comparisons that ship with the build. They are still authored in the v1
+ * shape, so they come through the same migration as anything in localStorage.
+ */
+const CURATED_PROJECTS: Project[] = migrateProjects(CURATED_VIEWS);
 
 const HEADER_HEIGHT = 56;
 const paneHeightPx = () => window.innerHeight - HEADER_HEIGHT;
 
 type Side = 'left' | 'right';
 
-export default function App() {
+/**
+ * The shape toolbar. 'edit' selects and reshapes what's already drawn; the rest
+ * arm a drawing gesture. Clicking the active tool again returns to 'off'.
+ */
+const SHAPE_TOOLS = [
+  { mode: 'edit', label: 'Select and reshape', Icon: MdOpenWith },
+  { mode: 'line', label: 'Measure a path', Icon: MdPolyline },
+  { mode: 'circle', label: 'Draw a circle', Icon: MdRadioButtonUnchecked },
+  { mode: 'polygon', label: 'Draw a polygon', Icon: MdPentagon },
+] as const satisfies readonly { mode: ShapeMode; label: string; Icon: unknown }[];
+
+interface ShapeTotals {
+  count: number;
+  lengthM: number;
+  areaM2: number;
+}
+
+function totalsFor(shapes: MeasureShape[], map: L.Map | null): ShapeTotals {
+  const totals: ShapeTotals = { count: shapes.length, lengthM: 0, areaM2: 0 };
+  if (!map) return totals;
+  for (const shape of shapes) {
+    const m = measureShape(shape, map);
+    totals.lengthM += m.lengthM ?? 0;
+    totals.areaM2 += m.areaM2 ?? 0;
+  }
+  return totals;
+}
+
+/** Larger over smaller, so the figure always reads as "N× bigger". */
+function ratioOf(a: number, b: number): number | null {
+  if (a <= 0 || b <= 0) return null;
+  return Math.max(a, b) / Math.min(a, b);
+}
+
+interface AppProps {
+  mode: AppMode;
+  /** Project to open on load, from `?project=`. Viewer falls back to the first curated one. */
+  initialProjectId: string | null;
+}
+
+export default function App({ mode, initialProjectId }: AppProps) {
+  const isAuthor = mode === 'tool';
+
   const [leftCity, setLeftCity] = useState<CityPreset>(CITIES.tokyo);
   const [rightCity, setRightCity] = useState<CityPreset>(CITIES.paris);
+  const [leftStyle, setLeftStyle] = useState<MapStyle>('satellite');
+  const [rightStyle, setRightStyle] = useState<MapStyle>('satellite');
+  /** Title/description of the project currently on screen, shown in view mode. */
+  const [openProject, setOpenProject] = useState<Project | null>(null);
   const [leftQuery, setLeftQuery] = useState('');
   const [rightQuery, setRightQuery] = useState('');
   const [splitPct, setSplitPct] = useState(50);
+  // Bumped to force the relayout effect to run even when splitPct itself is
+  // unchanged — loading a view whose split happens to match the current one
+  // would otherwise be a no-op state update and never apply its anchor.
+  const [pinToken, setPinToken] = useState(0);
   const [gridVisible, setGridVisible] = useState(false);
   const [gridStepPx, setGridStepPx] = useState(100);
   const [gridStepMeters, setGridStepMeters] = useState(100);
   const [gridOverrideMeters, setGridOverrideMeters] = useState<number | null>(null);
-  const [measuring, setMeasuring] = useState(false);
-  const [measureClearToken, setMeasureClearToken] = useState(0);
-  const [leftMeasureM, setLeftMeasureM] = useState<number | null>(null);
-  const [rightMeasureM, setRightMeasureM] = useState<number | null>(null);
+  const [shapeMode, setShapeMode] = useState<ShapeMode>('off');
+  const [leftShapes, setLeftShapes] = useState<MeasureShape[]>([]);
+  const [rightShapes, setRightShapes] = useState<MeasureShape[]>([]);
+  // At most one shape is selected across both panes, so the mirror and delete
+  // actions always have an unambiguous target.
+  const [selected, setSelected] = useState<{ side: Side; id: string } | null>(null);
   const [gridPopoverOpen, setGridPopoverOpen] = useState(false);
   const [gridInput, setGridInput] = useState<number | string>('');
   const [gridUnit, setGridUnit] = useState<'m' | 'km'>('km');
@@ -68,11 +145,12 @@ export default function App() {
   // they fetch tiles in the background. The header About button reopens it.
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(true);
   const [saveOpened, { open: openSave, close: closeSave }] = useDisclosure(false);
-  const [savedViews, setSavedViews] = useState<SavedView[]>(() => loadSavedViews());
+  const [projects, setProjects] = useState<Project[]>(() => loadProjects());
   const [pendingTitle, setPendingTitle] = useState('');
 
-  // Sync state: trigger lock + per-side interaction flags + debouncer.
-  const syncTriggerRef = useRef<Side | null>(null);
+  // Sync state: suppression flag + per-side interaction flags + debouncer.
+  // applyView raises suppressSyncRef for the duration of every programmatic
+  // move, which is the whole loop guard — see handleUserZoom.
   const suppressSyncRef = useRef(false);
   const isUserInteractingLeft = useRef(false);
   const isUserInteractingRight = useRef(false);
@@ -84,6 +162,96 @@ export default function App() {
   // Mirror of gridOverrideMeters readable from the stable map callbacks below
   // without making them depend on (and go stale against) the state value.
   const gridOverrideRef = useRef<number | null>(null);
+
+  // Where each pane should be re-centred after its size changes. Captured once
+  // at the start of a resize (or set explicitly when loading a view) and then
+  // restored verbatim on every subsequent frame, which is what keeps the
+  // framing stable — see pinView below. `zoom: null` means "keep whatever zoom
+  // the pane currently has".
+  const anchorRef = useRef<{
+    left: { center: L.LatLng; zoom: number | null };
+    right: { center: L.LatLng; zoom: number | null };
+  } | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  function mapFor(side: Side): L.Map | null {
+    return side === 'left' ? leftMapRef.current : rightMapRef.current;
+  }
+
+  /**
+   * The single writer of map view state. Everything that moves a map
+   * programmatically goes through here; the panes themselves only ever report
+   * what the user did.
+   *
+   * With `animate: false` Leaflet finishes the whole move before setView
+   * returns — the animated-zoom path bails out on `animate === false`, and the
+   * pan path ends in a synchronous `_rawPanBy` + `fire('moveend')` — so
+   * zoomend/moveend have already been dispatched by the time the flag is
+   * lowered. That is why this needs no timer, unlike the 100 ms suppression
+   * window it replaced.
+   */
+  const applyView = useCallback(
+    (side: Side, center: L.LatLngExpression, zoom: number) => {
+      const map = mapFor(side);
+      if (!map) return;
+
+      // Drop any sync the user's last gesture had queued: we are about to
+      // define both panes' state, and letting a stale timer fire afterwards
+      // would undo it.
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+
+      suppressSyncRef.current = true;
+      try {
+        map.setView(center, zoom, { animate: false });
+      } finally {
+        suppressSyncRef.current = false;
+      }
+    },
+    []
+  );
+
+  /**
+   * Re-measure a pane whose container changed size, then put `center` back
+   * exactly at the new pane centre.
+   *
+   * `invalidateSize()` defaults to `pan: true`, which applies its own
+   * half-the-size-delta correction. Running that once per pointermove during a
+   * splitter drag is what made the framing creep away from where the user left
+   * it. Passing `pan: false` and re-pinning to a centre that was captured once
+   * is drift-free however many times it runs, because the error is always
+   * measured against the same fixed anchor rather than against the previous
+   * (already nudged) position.
+   */
+  const pinView = useCallback(
+    (side: Side, center: L.LatLng, zoom: number | null) => {
+      const map = mapFor(side);
+      if (!map) return;
+      map.invalidateSize({ pan: false });
+      applyView(side, center, zoom ?? map.getZoom());
+    },
+    [applyView]
+  );
+
+  /** Snapshot both panes' current centres as the anchor for a resize. */
+  const captureAnchors = useCallback(() => {
+    const left = leftMapRef.current;
+    const right = rightMapRef.current;
+    if (!left || !right) return;
+    anchorRef.current = {
+      left: { center: left.getCenter(), zoom: null },
+      right: { center: right.getCenter(), zoom: null },
+    };
+  }, []);
+
+  const repinAnchors = useCallback(() => {
+    const anchors = anchorRef.current;
+    if (!anchors) return;
+    pinView('left', anchors.left.center, anchors.left.zoom);
+    pinView('right', anchors.right.center, anchors.right.zoom);
+  }, [pinView]);
 
   const recomputeGrid = useCallback((zoom: number, lat: number) => {
     const override = gridOverrideRef.current;
@@ -108,18 +276,62 @@ export default function App() {
     [recomputeGrid]
   );
 
-  const handleMeasure = useCallback((side: Side, meters: number | null) => {
-    if (side === 'left') setLeftMeasureM(meters);
-    else setRightMeasureM(meters);
+  const handleStyleChange = useCallback((side: Side, style: MapStyle) => {
+    if (side === 'left') setLeftStyle(style);
+    else setRightStyle(style);
   }, []);
 
-  const toggleMeasuring = useCallback(() => {
-    setMeasuring((on) => !on);
+  const handleShapesChange = useCallback((side: Side, next: MeasureShape[]) => {
+    if (side === 'left') setLeftShapes(next);
+    else setRightShapes(next);
   }, []);
 
-  const clearMeasurements = useCallback(() => {
-    setMeasureClearToken((t) => t + 1);
+  const handleSelectShape = useCallback((side: Side, id: string | null) => {
+    setSelected((prev) => {
+      if (id) return { side, id };
+      // A pane reporting "nothing selected" should only clear a selection that
+      // belongs to it. The other pane deselecting is just a side effect of this
+      // one taking over, and must not wipe the new selection.
+      return prev && prev.side === side ? null : prev;
+    });
   }, []);
+
+  const clearShapes = useCallback(() => {
+    setLeftShapes([]);
+    setRightShapes([]);
+    setSelected(null);
+  }, []);
+
+  const deleteSelected = useCallback(() => {
+    if (!selected) return;
+    const drop = (list: MeasureShape[]) => list.filter((s) => s.id !== selected.id);
+    if (selected.side === 'left') setLeftShapes(drop);
+    else setRightShapes(drop);
+    setSelected(null);
+  }, [selected]);
+
+  /**
+   * Copy the selected shape to the opposite pane at the same ground size,
+   * centred on that pane's current view. Comparing "this much area, over there"
+   * is the whole reason the panes are scale-locked.
+   */
+  const mirrorSelected = useCallback(() => {
+    if (!selected) return;
+    const fromMap = mapFor(selected.side);
+    const toSide: Side = selected.side === 'left' ? 'right' : 'left';
+    const toMap = mapFor(toSide);
+    if (!fromMap || !toMap) return;
+
+    const source = (selected.side === 'left' ? leftShapes : rightShapes).find(
+      (s) => s.id === selected.id
+    );
+    if (!source) return;
+
+    const copy = mirrorShape(source, fromMap, toMap.getCenter());
+    if (toSide === 'left') setLeftShapes((s) => [...s, copy]);
+    else setRightShapes((s) => [...s, copy]);
+    setSelected({ side: toSide, id: copy.id });
+  }, [selected, leftShapes, rightShapes]);
 
   const handleReady = useCallback(
     (handle: MapPaneHandle) => {
@@ -141,15 +353,42 @@ export default function App() {
     else isUserInteractingRight.current = interacting;
   }, []);
 
+  /**
+   * Picking a search result recentres *only* the pane that was searched, and it
+   * keeps the comparison the user had set up: the searched pane takes whatever
+   * zoom shows the same meters-per-pixel as the other pane does at the new
+   * latitude. The other pane is not touched at all.
+   *
+   * Previously the pane moved itself to the geocoder's hardcoded zoom 12, whose
+   * zoomend then dragged the opposite pane along with it — so searching a second
+   * place threw away the first pane's framing.
+   */
+  const handleSearchCity = useCallback(
+    (side: Side, city: CityPreset) => {
+      if (side === 'left') setLeftCity(city);
+      else setRightCity(city);
+
+      const other = mapFor(side === 'left' ? 'right' : 'left');
+      const self = mapFor(side);
+      const zoom = other
+        ? compensatedZoom(other.getZoom(), other.getCenter().lat, city.lat)
+        : // No opposite pane yet (first paint): hold this pane's own zoom.
+          self?.getZoom() ?? city.zoom;
+
+      applyView(side, [city.lat, city.lng], zoom);
+    },
+    [applyView]
+  );
+
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
       setAltitudeM(eyeAltitudeMeters(zoom, sourceLat, paneHeightPx()));
       recomputeGrid(zoom, sourceLat);
 
       if (suppressSyncRef.current) return;
-      if (syncTriggerRef.current && syncTriggerRef.current !== side) return;
 
-      const target = side === 'left' ? rightMapRef.current : leftMapRef.current;
+      const targetSide: Side = side === 'left' ? 'right' : 'left';
+      const target = mapFor(targetSide);
       if (!target) return;
 
       const targetSideInteracting =
@@ -158,61 +397,205 @@ export default function App() {
 
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
       debounceRef.current = window.setTimeout(() => {
-        const targetLat = target.getCenter().lat;
-        const compensated = compensatedZoom(zoom, sourceLat, targetLat);
-
-        syncTriggerRef.current = side;
-        target.setZoom(compensated, { animate: false });
-        window.setTimeout(() => {
-          syncTriggerRef.current = null;
-        }, 50);
+        const targetCenter = target.getCenter();
+        const compensated = compensatedZoom(zoom, sourceLat, targetCenter.lat);
+        // Go through applyView so the suppression flag is what stops the
+        // target's own zoomend from syncing straight back. This used to be a
+        // 50 ms timing window, which was already fragile and becomes untenable
+        // with zoomSnap off: zoom is now continuous, so these events fire on
+        // every frame of a wheel gesture rather than once per quarter step.
+        applyView(targetSide, targetCenter, compensated);
       }, 150);
     },
-    [recomputeGrid]
+    [recomputeGrid, applyView]
   );
+
+  // Measurements depend only on the shapes themselves — map.distance is a fixed
+  // spherical calculation, independent of zoom — so these recompute on edit
+  // rather than on every pan.
+  const leftTotals = useMemo(
+    () => totalsFor(leftShapes, leftMapRef.current),
+    [leftShapes]
+  );
+  const rightTotals = useMemo(
+    () => totalsFor(rightShapes, rightMapRef.current),
+    [rightShapes]
+  );
+
+  const selectedDetail = useMemo(() => {
+    if (!selected) return null;
+    const map = mapFor(selected.side);
+    const shape = (selected.side === 'left' ? leftShapes : rightShapes).find(
+      (s) => s.id === selected.id
+    );
+    if (!map || !shape) return null;
+    return { shape, metrics: measureShape(shape, map) };
+  }, [selected, leftShapes, rightShapes]);
+
+  /**
+   * Keyboard affordances aren't discoverable, so the active tool spells out what
+   * the gestures and keys do. Phrased for whatever is currently possible rather
+   * than listing every shortcut at once.
+   */
+  const shapeHint = useMemo(() => {
+    if (!isAuthor || shapeMode === 'off') return null;
+
+    if (shapeMode === 'edit') {
+      return selected
+        ? 'Drag a square handle to reshape, a round one to add a point · Delete to remove'
+        : 'Click a shape to select it';
+    }
+
+    const drawing =
+      shapeMode === 'circle'
+        ? 'Click the centre, then click again to set the radius'
+        : shapeMode === 'polygon'
+          ? 'Click to add corners · Enter or double-click to close'
+          : 'Click to add points · Enter or double-click to finish';
+
+    // A shape stays selected after it is drawn and the tool stays armed, so the
+    // delete shortcut is worth mentioning without repeating the reshape advice.
+    return selected
+      ? `${drawing} · Esc to cancel · Delete removes the selected shape`
+      : `${drawing} · Esc to cancel`;
+  }, [isAuthor, shapeMode, selected]);
+
+  const areaRatio = ratioOf(leftTotals.areaM2, rightTotals.areaM2);
+  const lengthRatio = ratioOf(leftTotals.lengthM, rightTotals.lengthM);
+  const hasShapes = leftShapes.length > 0 || rightShapes.length > 0;
+
+  // Delete removes the selected shape. Ignored while typing in a search box so
+  // it can't eat a backspace mid-query.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      if (!selected) return;
+      e.preventDefault();
+      deleteSelected();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selected, deleteSelected]);
+
+  // Open a project on first paint. `?project=<id>` names one explicitly; failing
+  // that the viewer falls back to the first curated comparison, because view
+  // mode with no project loaded would just be two unrelated default cities.
+  // The tool opens empty so authoring starts from a blank slate.
+  const bootedRef = useRef(false);
+  useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
+
+    const requested = initialProjectId
+      ? CURATED_PROJECTS.find((p) => p.id === initialProjectId) ??
+        projects.find((p) => p.id === initialProjectId)
+      : null;
+    const target = requested ?? (isAuthor ? null : CURATED_PROJECTS[0]);
+    if (target) loadProject(target);
+    // Runs once; `projects` and `loadProject` are read at boot and not tracked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProjectId, isAuthor]);
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
 
+  /** Where the pointer went down, to tell a click apart from a swipe. */
+  const dragOriginXRef = useRef(0);
+
+  const startSplitDrag = useCallback((e: ReactPointerEvent) => {
+    draggingRef.current = true;
+    dragOriginXRef.current = e.clientX;
+    document.body.style.cursor = 'ew-resize';
+  }, []);
+
+  // Pointer events rather than mouse events so the grip works under touch and
+  // pen input too. Dragging only moves the clip boundary — neither map changes
+  // size or centre — so unlike the old resizing layout there is nothing to
+  // re-measure or re-pin here.
   useEffect(() => {
-    function onMove(e: MouseEvent) {
+    function onMove(e: PointerEvent) {
       if (!draggingRef.current || !splitContainerRef.current) return;
       const rect = splitContainerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setSplitPct(Math.max(10, Math.min(90, pct)));
+      setSplitPct(Math.max(0, Math.min(100, pct)));
     }
-    function onUp() {
-      if (draggingRef.current) {
-        draggingRef.current = false;
-        document.body.style.cursor = '';
-        leftMapRef.current?.invalidateSize();
-        rightMapRef.current?.invalidateSize();
-      }
+    function onUp(e: PointerEvent) {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.cursor = '';
+      // A press that never really moved is a click, not a swipe: snap back to
+      // centre. This is the main way back after swiping right over to one side.
+      if (Math.abs(e.clientX - dragOriginXRef.current) < 4) setSplitPct(50);
     }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, []);
 
+  // Re-measure and re-pin after something actually changed the panes' size or
+  // framing — a window resize, or a project being loaded. Splitter drags no
+  // longer belong here: under the curtain layout they only move a clip
+  // boundary, leaving both maps exactly where they were.
   useEffect(() => {
-    leftMapRef.current?.invalidateSize();
-    rightMapRef.current?.invalidateSize();
-  }, [splitPct]);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      // Every invalidateSize MUST be followed by a pin. On its own, `pan: false`
+      // re-measures without compensating, so the pane keeps its pixel origin and
+      // the geographic centre slides by half the size delta — the very drift
+      // this effect exists to prevent. If no anchor was captured (a size change
+      // we didn't initiate), take one now: getCenter() still reports against the
+      // old cached size, so it names the point currently in the middle of the
+      // pane, which is exactly what should stay there.
+      if (!anchorRef.current) captureAnchors();
+      repinAnchors();
+      // A one-shot pin (loading a view, or the final pin after a drag) is
+      // consumed here; a live drag keeps its anchor until pointerup.
+      if (!draggingRef.current) anchorRef.current = null;
+    });
+    return () => {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [pinToken, captureAnchors, repinAnchors]);
 
+  // Window resize. Leaflet's own trackResize is switched off in MapPane, so
+  // this is the only thing re-measuring the panes; see the note there for why
+  // we took it over rather than letting both run.
   useEffect(() => {
+    let timer: number | null = null;
     function onResize() {
       const map = leftMapRef.current;
-      if (!map) return;
-      setAltitudeM(
-        eyeAltitudeMeters(map.getZoom(), map.getCenter().lat, paneHeightPx())
-      );
+      if (map) {
+        setAltitudeM(
+          eyeAltitudeMeters(map.getZoom(), map.getCenter().lat, paneHeightPx())
+        );
+      }
+      // Capture on the first event of a burst only: by the second event the
+      // centre has already shifted, and anchoring to that would bake the drift
+      // in rather than undo it.
+      if (timer == null) captureAnchors();
+      else window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        repinAnchors();
+        anchorRef.current = null;
+      }, 120);
     }
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [captureAnchors, repinAnchors]);
 
   function handleSaveClick() {
     const left = leftQuery.trim() || leftCity.name;
@@ -229,30 +612,38 @@ export default function App() {
     closeSave();
 
     try {
-      const view: SavedView = {
-        id:
-          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      // Capture the live state of everything a reader needs to see the same
+      // comparison: both framings, the split between them, the grid, the tile
+      // styles and every measurement object.
+      const project: Project = {
+        schemaVersion: SCHEMA_VERSION,
+        id: createProjectId(),
         title,
+        splitPct,
+        grid: { visible: gridVisible, overrideMeters: gridOverrideMeters },
         left: {
-          ...leftCity,
+          city: leftCity,
           lat: leftMap.getCenter().lat,
           lng: leftMap.getCenter().lng,
           zoom: leftMap.getZoom(),
+          style: leftStyle,
+          shapes: leftShapes,
         },
         right: {
-          ...rightCity,
+          city: rightCity,
           lat: rightMap.getCenter().lat,
           lng: rightMap.getCenter().lng,
           zoom: rightMap.getZoom(),
+          style: rightStyle,
+          shapes: rightShapes,
         },
         createdAt: Date.now(),
       };
 
-      const next = [view, ...savedViews];
-      setSavedViews(next);
-      persistSavedViews(next);
+      const next = [project, ...projects];
+      setProjects(next);
+      persistProjects(next);
+      setOpenProject(project);
 
       notifications.show({
         title: 'Draft saved',
@@ -271,24 +662,60 @@ export default function App() {
     }
   }
 
+  const loadProject = useCallback((project: Project) => {
+    setOpenProject(project);
+    setLeftCity(project.left.city);
+    setRightCity(project.right.city);
+    setLeftStyle(project.left.style);
+    setRightStyle(project.right.style);
+    setLeftShapes(project.left.shapes);
+    setRightShapes(project.right.shapes);
+    setSelected(null);
+    setGridVisible(project.grid.visible);
+    applyGridOverride(project.grid.overrideMeters);
+
+    // Recompute the right pane's zoom from the left rather than trusting what
+    // was stored. Projects authored while zoomSnap was 0.25 carry up to ~9% of
+    // quantisation error in that second zoom; deriving it fresh makes every
+    // saved comparison — including the seven curated ones — land exactly
+    // scale-matched. The left pane's zoom is the authored intent and is used
+    // verbatim.
+    const rightZoom = compensatedZoom(
+      project.left.zoom,
+      project.left.lat,
+      project.right.lat
+    );
+
+    // Queue the framing as a one-shot anchor and let the relayout effect apply
+    // it next frame. Setting the view directly here would reframe the moment the
+    // panes take their new widths — the restore has to land *after* the layout,
+    // not before it.
+    anchorRef.current = {
+      left: {
+        center: L.latLng(project.left.lat, project.left.lng),
+        zoom: project.left.zoom,
+      },
+      right: {
+        center: L.latLng(project.right.lat, project.right.lng),
+        zoom: rightZoom,
+      },
+    };
+    setSplitPct(project.splitPct);
+    setPinToken((t) => t + 1);
+  }, [applyGridOverride]);
+
   function handleLoadView(id: string) {
-    const view =
-      CURATED_VIEWS.find((v) => v.id === id) ||
-      savedViews.find((v) => v.id === id);
-    if (!view) return;
-    suppressSyncRef.current = true;
-    setLeftCity(view.left);
-    setRightCity(view.right);
-    window.setTimeout(() => {
-      suppressSyncRef.current = false;
-    }, 100);
+    const project =
+      CURATED_PROJECTS.find((p) => p.id === id) ||
+      projects.find((p) => p.id === id);
+    if (project) loadProject(project);
   }
 
   function handleDeleteView(id: string) {
-    const next = savedViews.filter((v) => v.id !== id);
-    setSavedViews(next);
+    const next = projects.filter((p) => p.id !== id);
+    setProjects(next);
     try {
-      persistSavedViews(next);
+      persistProjects(next);
     } catch (err) {
       notifications.show({
         title: 'Delete failed',
@@ -302,14 +729,14 @@ export default function App() {
   }
 
   function handleExportDrafts() {
-    if (savedViews.length === 0) return;
-    const code = JSON.stringify(savedViews, null, 2);
+    if (projects.length === 0) return;
+    const code = JSON.stringify(projects, null, 2);
     navigator.clipboard
       .writeText(code)
       .then(() => {
         notifications.show({
           title: 'Copied to clipboard',
-          message: `${savedViews.length} draft(s) — paste into src/curatedViews.ts`,
+          message: `${projects.length} draft(s) — paste into src/curatedViews.ts`,
           color: 'blue',
         });
       })
@@ -330,7 +757,22 @@ export default function App() {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap={0} wrap="nowrap" align="center">
             <Title order={4}>MapCompare</Title>
+            {/* View mode leads with what the comparison *is*; the authoring
+                controls it was built with are not part of the content. */}
+            {!isAuthor && openProject && (
+              <Group gap={8} wrap="nowrap" align="baseline" ml={32}>
+                <Text fw={600} size="sm" tt="capitalize">
+                  {openProject.title}
+                </Text>
+                {openProject.description && (
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {openProject.description}
+                  </Text>
+                )}
+              </Group>
+            )}
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
+              {isAuthor && (
               <Group gap={6} wrap="nowrap" align="center">
                 <Switch
                   size="sm"
@@ -420,39 +862,81 @@ export default function App() {
                 </Popover>
                 )}
               </Group>
+              )}
+              {isAuthor && (
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
               />
-              <Group gap="xs" wrap="nowrap" align="center">
-                <Tooltip label="Measure distance" withArrow>
-                  <ActionIcon
-                    size="lg"
-                    variant={measuring ? 'filled' : 'default'}
-                    onClick={toggleMeasuring}
-                    aria-label="Measure distance"
-                  >
-                    <MdStraighten size={18} />
-                  </ActionIcon>
-                </Tooltip>
-                {measuring && (
-                  <Tooltip label="Clear measurements" withArrow>
+              )}
+              {isAuthor && (
+              <Group gap={4} wrap="nowrap" align="center">
+                {SHAPE_TOOLS.map(({ mode, label, Icon }) => (
+                  <Tooltip key={mode} label={label} withArrow>
+                    <ActionIcon
+                      size="lg"
+                      variant={shapeMode === mode ? 'filled' : 'default'}
+                      onClick={() =>
+                        setShapeMode((current) => (current === mode ? 'off' : mode))
+                      }
+                      aria-label={label}
+                      aria-pressed={shapeMode === mode}
+                    >
+                      <Icon size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                ))}
+                {selected && (
+                  <>
+                    <Tooltip
+                      label="Copy to the other pane at the same ground size"
+                      withArrow
+                    >
+                      <ActionIcon
+                        size="lg"
+                        variant="default"
+                        onClick={mirrorSelected}
+                        aria-label="Copy shape to the other pane"
+                      >
+                        <MdCompareArrows size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Delete selected shape (Del)" withArrow>
+                      <ActionIcon
+                        size="lg"
+                        variant="subtle"
+                        color="gray"
+                        onClick={deleteSelected}
+                        aria-label="Delete selected shape"
+                      >
+                        <MdDeleteOutline size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </>
+                )}
+                {hasShapes && (
+                  <Tooltip label="Clear all shapes" withArrow>
                     <ActionIcon
                       size="lg"
                       variant="subtle"
                       color="gray"
-                      onClick={clearMeasurements}
-                      aria-label="Clear measurements"
+                      onClick={clearShapes}
+                      aria-label="Clear all shapes"
                     >
                       <MdClose size={18} />
                     </ActionIcon>
                   </Tooltip>
                 )}
               </Group>
+              )}
+              {isAuthor && (
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
               />
+              )}
+              {/* The altitude read-out stays in view mode: it is a measurement,
+                  which is content, not an authoring control. */}
               <Badge variant="light" color="gray" size="sm" radius="sm">
                 Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
               </Badge>
@@ -460,14 +944,14 @@ export default function App() {
           </Group>
           <Group gap="sm" wrap="nowrap" align="center">
             <ExploreMenu
-              isAuthor={IS_AUTHOR}
-              curatedViews={CURATED_VIEWS}
-              draftViews={savedViews}
+              isAuthor={isAuthor}
+              curatedViews={CURATED_PROJECTS}
+              draftViews={projects}
               onLoad={handleLoadView}
               onDeleteDraft={handleDeleteView}
               onExportDrafts={handleExportDrafts}
             />
-            {IS_AUTHOR && (
+            {isAuthor && (
               <Button variant="default" size="sm" onClick={handleSaveClick}>
                 Save
               </Button>
@@ -481,51 +965,76 @@ export default function App() {
 
       <AppShell.Main>
         <div className="split-container" ref={splitContainerRef}>
-          <div style={{ width: `${splitPct}%`, height: '100%' }}>
+          {/* Both layers are full-size and superimposed; only the right one is
+              clipped. Order matters — the right layer must paint over the left. */}
+          <div className="map-layer">
             <MapPane
               side="left"
               initialCity={CITIES.tokyo}
               city={leftCity}
               gridVisible={gridVisible}
               gridStepPx={gridStepPx}
-              measuring={measuring}
-              clearToken={measureClearToken}
+              style={leftStyle}
+              onStyleChange={handleStyleChange}
+              showControls={isAuthor}
+              shapeMode={isAuthor ? shapeMode : 'off'}
+              shapes={leftShapes}
+              selectedShapeId={selected?.side === 'left' ? selected.id : null}
               query={leftQuery}
               onQueryChange={setLeftQuery}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}
-              onSearchCity={(_, c) => setLeftCity(c)}
-              onMeasure={handleMeasure}
+              onSearchCity={handleSearchCity}
+              onShapesChange={handleShapesChange}
+              onSelectShape={handleSelectShape}
             />
           </div>
           <div
-            className="splitter"
-            style={{ left: `${splitPct}%` }}
-            onMouseDown={() => {
-              draggingRef.current = true;
-              document.body.style.cursor = 'ew-resize';
-            }}
-          />
-          <div style={{ width: `${100 - splitPct}%`, height: '100%' }}>
+            className="map-layer"
+            style={{ clipPath: `inset(0 0 0 ${splitPct}%)` }}
+          >
             <MapPane
               side="right"
               initialCity={CITIES.paris}
               city={rightCity}
               gridVisible={gridVisible}
               gridStepPx={gridStepPx}
-              measuring={measuring}
-              clearToken={measureClearToken}
+              style={rightStyle}
+              onStyleChange={handleStyleChange}
+              showControls={isAuthor}
+              shapeMode={isAuthor ? shapeMode : 'off'}
+              shapes={rightShapes}
+              selectedShapeId={selected?.side === 'right' ? selected.id : null}
               query={rightQuery}
               onQueryChange={setRightQuery}
               onReady={handleReady}
               onUserZoom={handleUserZoom}
               onInteractionChange={handleInteraction}
-              onSearchCity={(_, c) => setRightCity(c)}
-              onMeasure={handleMeasure}
+              onSearchCity={handleSearchCity}
+              onShapesChange={handleShapesChange}
+              onSelectShape={handleSelectShape}
             />
           </div>
-          {measuring && leftMeasureM != null && rightMeasureM != null && (
+          <div
+            className="splitter"
+            style={{ left: `${splitPct}%` }}
+            data-off-centre={Math.abs(splitPct - 50) > 0.5}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to swipe between the two maps, click to centre the split"
+            title="Drag to swipe · click to snap back to 50%"
+            onPointerDown={startSplitDrag}
+          />
+          <div className="readout-stack">
+          {shapeHint && (
+            <Paper className="shape-hint" shadow="md" px="sm" py={6} radius="md" withBorder>
+              <Text size="xs" c="dimmed">
+                {shapeHint}
+              </Text>
+            </Paper>
+          )}
+          {hasShapes && (
             <Paper
               className="measure-panel"
               shadow="md"
@@ -533,38 +1042,77 @@ export default function App() {
               radius="md"
               withBorder
             >
-              <Group gap="lg" wrap="nowrap">
-                <div>
-                  <Text size="xs" c="dimmed">
-                    Left
-                  </Text>
-                  <Text fw={600} size="sm">
-                    {formatDistance(leftMeasureM)}
-                  </Text>
-                </div>
-                <div>
-                  <Text size="xs" c="dimmed">
-                    Right
-                  </Text>
-                  <Text fw={600} size="sm">
-                    {formatDistance(rightMeasureM)}
-                  </Text>
-                </div>
-                <div>
-                  <Text size="xs" c="dimmed">
-                    Ratio
-                  </Text>
-                  <Text fw={600} size="sm" c="blue">
-                    {(
-                      Math.max(leftMeasureM, rightMeasureM) /
-                      Math.max(1, Math.min(leftMeasureM, rightMeasureM))
-                    ).toFixed(2)}
-                    ×
-                  </Text>
-                </div>
+              <Group gap="xl" wrap="nowrap" align="flex-start">
+                {(
+                  [
+                    ['Left', leftTotals],
+                    ['Right', rightTotals],
+                  ] as const
+                ).map(([label, totals]) => (
+                  <div key={label}>
+                    <Text size="xs" c="dimmed">
+                      {label}
+                    </Text>
+                    <Text fw={600} size="sm">
+                      {totals.count} shape{totals.count === 1 ? '' : 's'}
+                    </Text>
+                    {totals.areaM2 > 0 && (
+                      <Text size="xs" c="dimmed">
+                        {formatArea(totals.areaM2)}
+                      </Text>
+                    )}
+                    {totals.lengthM > 0 && (
+                      <Text size="xs" c="dimmed">
+                        {formatDistance(totals.lengthM)}
+                      </Text>
+                    )}
+                  </div>
+                ))}
+
+                {(areaRatio != null || lengthRatio != null) && (
+                  <div>
+                    <Text size="xs" c="dimmed">
+                      Ratio
+                    </Text>
+                    {areaRatio != null && (
+                      <Text fw={600} size="sm" c="blue">
+                        {areaRatio.toFixed(2)}× area
+                      </Text>
+                    )}
+                    {lengthRatio != null && (
+                      <Text fw={600} size="sm" c="blue">
+                        {lengthRatio.toFixed(2)}× length
+                      </Text>
+                    )}
+                  </div>
+                )}
+
+                {selectedDetail && (
+                  <div>
+                    <Text size="xs" c="dimmed" tt="capitalize">
+                      {selectedDetail.shape.kind} selected
+                    </Text>
+                    {selectedDetail.metrics.radiusM != null && (
+                      <Text fw={600} size="sm">
+                        r {formatDistance(selectedDetail.metrics.radiusM)}
+                      </Text>
+                    )}
+                    {selectedDetail.metrics.areaM2 != null && (
+                      <Text size="xs" c="dimmed">
+                        {formatArea(selectedDetail.metrics.areaM2)}
+                      </Text>
+                    )}
+                    {selectedDetail.metrics.lengthM != null && (
+                      <Text size="xs" c="dimmed">
+                        {formatDistance(selectedDetail.metrics.lengthM)}
+                      </Text>
+                    )}
+                  </div>
+                )}
               </Group>
             </Paper>
           )}
+          </div>
         </div>
       </AppShell.Main>
 

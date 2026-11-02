@@ -18,11 +18,18 @@ interface AboutModalProps {
 }
 
 export function AboutModal({ opened, onClose }: AboutModalProps) {
+  // Note: the `title` below is styled Text rather than a <Title>. Mantine's
+  // Modal.Title is already an <h2>, so a <Title order={3}> inside it nests an
+  // <h3> within an <h2> — invalid HTML, and React warns about it.
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title={<Title order={3}>Welcome to MapCompare</Title>}
+      title={
+        <Text fw={700} fz="h3">
+          Welcome to MapCompare
+        </Text>
+      }
       size="lg"
       centered
     >
@@ -53,8 +60,13 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
               and click its length to pin a fixed grid size.
             </List.Item>
             <List.Item>
-              Turn on <strong>Measure</strong> and click two points on each map
-              to compare true ground distances.
+              <strong>Draw</strong> a path, circle or polygon to measure ground
+              distance and area. Drag the handles to reshape — the small round
+              ones on each edge add a new point.
+            </List.Item>
+            <List.Item>
+              <strong>Copy a shape to the other pane</strong> to see the same
+              real-world footprint over the other city.
             </List.Item>
             <List.Item>
               Open <strong>Explore</strong> for curated city comparisons.

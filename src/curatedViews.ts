@@ -1,4 +1,5 @@
 import type { SavedView } from './savedViews';
+import type { Project } from './projects';
 
 /**
  * Hand-curated comparisons that ship with the deployed app. Visitors see
@@ -6,12 +7,17 @@ import type { SavedView } from './savedViews';
  *
  * Authoring workflow:
  *   1. `npm run dev`
- *   2. Pan/zoom each pane to set up a comparison, then click Save
+ *   2. Set up a comparison — framing, split, grid, tile styles, shapes —
+ *      then click Save
  *   3. Open Explore → "Export drafts to clipboard"
  *   4. Paste the JSON between the brackets below
  *   5. Commit and push — the deploy workflow ships it
+ *
+ * The union type is deliberate: entries below predate the Project schema and
+ * are still in the v1 shape. `migrateProject` upgrades them on read, so they
+ * never had to be rewritten. New exports arrive as Projects.
  */
-export const CURATED_VIEWS: SavedView[] = [
+export const CURATED_VIEWS: (SavedView | Project)[] = [
   {
     id: 'b70081ca-b4e7-4c03-9c74-08fc5d33bc81',
     title: 'amsterdam vs venice',

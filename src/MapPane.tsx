@@ -15,7 +15,8 @@ import { useDebouncedValue } from '@mantine/hooks';
 import type { CityPreset } from './presets';
 import { createTileLayer, type MapStyle } from './tileLayers';
 import { drawScaleGrid } from './GridLayer';
-import { formatDistance } from './altitude';
+import { ShapeLayer } from './ShapeLayer';
+import type { MeasureShape, ShapeMode } from './shapes';
 
 type Side = 'left' | 'right';
 
@@ -30,15 +31,23 @@ interface MapPaneProps {
   city: CityPreset;
   gridVisible: boolean;
   gridStepPx: number;
-  measuring: boolean;
-  clearToken: number;
+  /** Owned by App so it can be captured in a saved project. */
+  style: MapStyle;
+  onStyleChange: (side: Side, style: MapStyle) => void;
+  /** Active shape tool for this pane. 'off' makes existing shapes read-only. */
+  shapeMode: ShapeMode;
+  /** Authoring affordances (search, tile-style picker) are hidden in view mode. */
+  showControls: boolean;
+  shapes: MeasureShape[];
+  selectedShapeId: string | null;
   query: string;
   onQueryChange: (query: string) => void;
   onReady: (handle: MapPaneHandle) => void;
   onUserZoom: (side: Side, zoom: number, lat: number) => void;
   onInteractionChange: (side: Side, interacting: boolean) => void;
   onSearchCity: (side: Side, city: CityPreset) => void;
-  onMeasure: (side: Side, meters: number | null) => void;
+  onShapesChange: (side: Side, shapes: MeasureShape[]) => void;
+  onSelectShape: (side: Side, id: string | null) => void;
 }
 
 interface SearchResult {
@@ -52,6 +61,49 @@ const STYLE_OPTIONS = [
   { label: 'MAP', value: 'roadmap' },
   { label: 'SAT', value: 'satellite' },
 ];
+
+/**
+ * Wheel-zoom response curve.
+ *
+ * Leaflet's built-in wheel zoom runs a fixed, heavily damped formula whose
+ * per-burst gain saturates at about four zoom levels, and it leaned on
+ * zoomSnap's round-up to make small gestures register at all. With snapping off
+ * (needed for exact scale matching) a trackpad swipe produced a tiny fraction of
+ * a level, so getting from a continent down to a street took dozens of swipes.
+ *
+ * Zoom is logarithmic, so a constant levels-per-scroll already means a constant
+ * *ratio* change of scale. This ramp sits on top of that: far out a gesture
+ * should cross several levels so a continent-to-city trip is quick, while close
+ * in it should move a fraction of a level so a building can be framed. Between
+ * the two bounds the rate interpolates linearly in zoom.
+ *
+ * Calibration: a firm trackpad swipe is roughly 500px of accumulated deltaY, so
+ * the fast rate crosses ~3 zoom levels per swipe and the slow rate ~1.2. One
+ * notch of a wheel mouse (~100px) moves 0.65 levels out wide and 0.25 up close,
+ * which is fine enough to frame a building.
+ */
+const ZOOM_RAMP_START = 5; // at/below this zoom, scroll at the fast rate
+const ZOOM_RAMP_END = 16; // at/above this zoom, scroll at the slow rate
+const ZOOM_LEVELS_PER_100PX_FAST = 0.65;
+const ZOOM_LEVELS_PER_100PX_SLOW = 0.25;
+
+function zoomLevelsPerPixel(zoom: number): number {
+  const t = Math.min(
+    1,
+    Math.max(0, (zoom - ZOOM_RAMP_START) / (ZOOM_RAMP_END - ZOOM_RAMP_START))
+  );
+  const per100 =
+    ZOOM_LEVELS_PER_100PX_FAST +
+    (ZOOM_LEVELS_PER_100PX_SLOW - ZOOM_LEVELS_PER_100PX_FAST) * t;
+  return per100 / 100;
+}
+
+/** Wheel deltas arrive in pixels, lines or pages depending on the device. */
+function wheelPixels(e: WheelEvent): number {
+  if (e.deltaMode === 1) return e.deltaY * 16; // lines
+  if (e.deltaMode === 2) return e.deltaY * 400; // pages
+  return e.deltaY;
+}
 
 function resultToCity(hit: SearchResult): CityPreset {
   return {
@@ -72,27 +124,35 @@ export function MapPane({
   city,
   gridVisible,
   gridStepPx,
-  measuring,
-  clearToken,
+  style,
+  onStyleChange,
+  shapeMode,
+  showControls,
+  shapes,
+  selectedShapeId,
   query,
   onQueryChange,
   onReady,
   onUserZoom,
   onInteractionChange,
   onSearchCity,
-  onMeasure,
+  onShapesChange,
+  onSelectShape,
 }: MapPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const firstLoadDoneRef = useRef(false);
-  // Measurement state, kept in refs so the clear effect and the live
-  // rubber-band handler can reach the active layer/anchor without re-running.
-  const measureLayerRef = useRef<L.LayerGroup | null>(null);
-  const measureStartRef = useRef<L.LatLng | null>(null);
-  const measureRubberRef = useRef<L.Polyline | null>(null);
-  const [style, setStyle] = useState<MapStyle>('satellite');
+  const shapeLayerRef = useRef<ShapeLayer | null>(null);
+  // The shape layer is built once and then driven by props. Its callbacks are
+  // read through refs so the layer never has to be torn down and rebuilt just
+  // because a parent handler got a new identity — a rebuild mid-drag would drop
+  // the handle under the cursor.
+  const onShapesChangeRef = useRef(onShapesChange);
+  const onSelectShapeRef = useRef(onSelectShape);
+  onShapesChangeRef.current = onShapesChange;
+  onSelectShapeRef.current = onSelectShape;
   const [tilesLoading, setTilesLoading] = useState(true);
 
   // Search autocomplete state.
@@ -109,12 +169,35 @@ export function MapPane({
       center: [initialCity.lat, initialCity.lng],
       zoom: initialCity.zoom,
       zoomControl: side === 'left',
-      zoomSnap: 0.25,
+      // No zoom snapping. The whole premise is that one pixel covers the same
+      // ground distance on both panes, and the compensated zoom that achieves
+      // that is an arbitrary real number (sourceZoom + log2(cos ratio)). Snapping
+      // it to a 0.25 grid quantised the correction and left the panes up to
+      // 2^0.125 — about 9% — apart in scale, which is visible when comparing
+      // equal-sized shapes. zoomDelta still governs the +/- and keyboard steps,
+      // so stepped zooming feels the same; only wheel zoom becomes continuous.
+      zoomSnap: 0,
       zoomDelta: 0.5,
-      wheelDebounceTime: 40,
-      attributionControl: true,
+      // Replaced by the wheel handler below, which ramps the rate by zoom level.
+      scrollWheelZoom: false,
+      // Added explicitly below so its corner can depend on the side.
+      attributionControl: false,
+      // App owns resize handling. Leaflet's own tracker calls invalidateSize
+      // with pan:true on a requestAnimationFrame, which nudges the view by half
+      // the size delta — exactly the shift App is re-pinning away. With both
+      // running they fight, and the pane ends up framed somewhere between the
+      // two. See pinView in App.tsx.
+      trackResize: false,
     });
-    L.control.scale({ position: 'bottomright', imperial: true, metric: true }).addTo(map);
+    // Both maps are superimposed and full-width, so the left map's bottom-right
+    // corner sits underneath the right map's visible half and anything placed
+    // there would be hidden. Each pane keeps its controls in its own outer
+    // corner instead. The attribution control is built here rather than via the
+    // attributionControl option for the same reason — it must be added before
+    // the tile layer, which registers its attribution with it.
+    const corner = side === 'left' ? 'bottomleft' : 'bottomright';
+    L.control.attribution({ position: corner }).addTo(map);
+    L.control.scale({ position: corner, imperial: true, metric: true }).addTo(map);
     mapRef.current = map;
 
     const handleZoomEnd = () => {
@@ -174,92 +257,80 @@ export function MapPane({
     return () => observer.disconnect();
   }, [gridVisible, gridStepPx]);
 
+  // Wheel/pinch zoom, replacing Leaflet's (disabled in the map options above).
+  // Deltas are accumulated and applied once per animation frame, so a fast
+  // trackpad flick becomes one zoom step per painted frame instead of dozens of
+  // tiny ones.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setView([city.lat, city.lng], city.zoom, { animate: false });
-  }, [city]);
+    const container = map.getContainer();
 
-  // Measurement mode: click a first point, then a live dashed line follows the
-  // cursor until the second click commits the segment and reports the true
-  // ground distance. A subsequent click starts a fresh line.
+    let accumulated = 0;
+    let anchor: L.Point | null = null;
+    let frame: number | null = null;
+
+    const apply = () => {
+      frame = null;
+      const target = mapRef.current;
+      if (!target || !anchor) return;
+      const delta = accumulated;
+      accumulated = 0;
+      const zoom = target.getZoom();
+      // Scrolling away from you (positive deltaY) zooms out.
+      const next = zoom - delta * zoomLevelsPerPixel(zoom);
+      // setZoomAround keeps the point under the cursor pinned, which is what
+      // makes wheel zoom feel like it aims where you point. It clamps to the
+      // layer's min/max zoom for us.
+      target.setZoomAround(anchor, next, { animate: false });
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // Must preventDefault: a Mac trackpad pinch arrives as ctrl+wheel, and
+      // left alone the browser would zoom the whole page instead of the map.
+      e.preventDefault();
+      accumulated += wheelPixels(e);
+      anchor = map.mouseEventToContainerPoint(e);
+      if (frame == null) frame = requestAnimationFrame(apply);
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+      if (frame != null) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  // Build the shape layer once per map, then keep it in sync through the three
+  // effects below. It is deliberately not rebuilt on prop changes.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !measuring) return;
+    if (!map) return;
 
-    const layer = L.layerGroup().addTo(map);
-    measureLayerRef.current = layer;
-    measureStartRef.current = null;
-    measureRubberRef.current = null;
-    map.getContainer().style.cursor = 'crosshair';
-
-    const handleClick = (e: L.LeafletMouseEvent) => {
-      const start = measureStartRef.current;
-      if (start === null) {
-        layer.clearLayers();
-        measureRubberRef.current = null;
-        onMeasure(side, null);
-        measureStartRef.current = e.latlng;
-        L.circleMarker(e.latlng, { radius: 5, color: '#4dabf7', weight: 2 }).addTo(layer);
-      } else {
-        const end = e.latlng;
-        const meters = map.distance(start, end);
-        if (measureRubberRef.current) {
-          layer.removeLayer(measureRubberRef.current);
-          measureRubberRef.current = null;
-        }
-        L.polyline([start, end], { color: '#4dabf7', weight: 3 }).addTo(layer);
-        L.circleMarker(end, { radius: 5, color: '#4dabf7', weight: 2 })
-          .bindTooltip(formatDistance(meters), { permanent: true, direction: 'top' })
-          .addTo(layer);
-        onMeasure(side, meters);
-        measureStartRef.current = null;
-      }
-    };
-
-    // Rubber-band preview: redraw a dashed line from the anchor to the cursor.
-    const handleMove = (e: L.LeafletMouseEvent) => {
-      const start = measureStartRef.current;
-      if (!start) return;
-      if (measureRubberRef.current) {
-        measureRubberRef.current.setLatLngs([start, e.latlng]);
-      } else {
-        measureRubberRef.current = L.polyline([start, e.latlng], {
-          color: '#4dabf7',
-          weight: 2,
-          opacity: 0.8,
-          dashArray: '5,6',
-        }).addTo(layer);
-      }
-    };
-
-    map.on('click', handleClick);
-    map.on('mousemove', handleMove);
+    const layer = new ShapeLayer(map, {
+      onChange: (next) => onShapesChangeRef.current(side, next),
+      onSelect: (id) => onSelectShapeRef.current(side, id),
+    });
+    shapeLayerRef.current = layer;
 
     return () => {
-      map.off('click', handleClick);
-      map.off('mousemove', handleMove);
-      map.removeLayer(layer);
-      measureLayerRef.current = null;
-      measureStartRef.current = null;
-      measureRubberRef.current = null;
-      map.getContainer().style.cursor = '';
-      onMeasure(side, null);
+      layer.destroy();
+      shapeLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [measuring]);
+  }, []);
 
-  // Clear the current measurement when the parent bumps the clear token,
-  // staying in measure mode so the user can immediately draw a new line.
   useEffect(() => {
-    if (clearToken === 0) return;
-    const layer = measureLayerRef.current;
-    if (layer) layer.clearLayers();
-    measureStartRef.current = null;
-    measureRubberRef.current = null;
-    onMeasure(side, null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearToken]);
+    shapeLayerRef.current?.setShapes(shapes);
+  }, [shapes]);
+
+  useEffect(() => {
+    shapeLayerRef.current?.setMode(shapeMode);
+  }, [shapeMode]);
+
+  useEffect(() => {
+    shapeLayerRef.current?.select(selectedShapeId);
+  }, [selectedShapeId]);
 
   // Debounced geocoding: fetch suggestions as the user types.
   useEffect(() => {
@@ -310,7 +381,11 @@ export function MapPane({
   ) : null;
 
   return (
-    <div className="map-pane">
+    <div className={`map-pane map-pane--${side}`}>
+      {/* View mode presents an authored comparison, so the per-pane authoring
+          controls come out. Pan and zoom stay — exploring the published
+          comparison is the point; re-aiming it at another city is not. */}
+      {showControls && (
       <div className="pane-toolbar">
         <div style={{ flex: '1 1 auto', maxWidth: 400, minWidth: 0 }}>
           <Combobox store={combobox} onOptionSubmit={handleOptionSubmit}>
@@ -350,12 +425,13 @@ export function MapPane({
         </div>
         <SegmentedControl
           value={style}
-          onChange={(v) => setStyle(v as MapStyle)}
+          onChange={(v) => onStyleChange(side, v as MapStyle)}
           data={STYLE_OPTIONS}
           size="sm"
           style={{ marginLeft: 'auto' }}
         />
       </div>
+      )}
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
       <LoadingOverlay
         visible={tilesLoading}

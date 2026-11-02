@@ -8,12 +8,12 @@ import {
   UnstyledButton,
   Group,
 } from '@mantine/core';
-import type { SavedView } from './savedViews';
+import type { Project } from './projects';
 
 interface Props {
   isAuthor: boolean;
-  curatedViews: SavedView[];
-  draftViews: SavedView[];
+  curatedViews: Project[];
+  draftViews: Project[];
   onLoad: (id: string) => void;
   onDeleteDraft: (id: string) => void;
   onExportDrafts: () => void;

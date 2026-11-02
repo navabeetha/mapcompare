@@ -1,27 +1,21 @@
 import type { CityPreset } from './presets';
 
-const STORAGE_KEY = 'mapcompare:savedViews';
-
+/**
+ * The v1 saved-comparison record, superseded by `Project` in `projects.ts`.
+ *
+ * It survives for two reasons: the seven curated comparisons in
+ * `curatedViews.ts` are still written in this shape, and drafts saved before
+ * the schema change are still in localStorage. `migrateProject` upgrades both
+ * on read, so nothing had to be rewritten by hand.
+ *
+ * Don't author new data against this type — write a `Project`.
+ */
 export interface SavedView {
   id: string;
   title: string;
+  /** In v1 the preset's own lat/lng/zoom doubled as the pane's view. */
   left: CityPreset;
   right: CityPreset;
+  splitPct?: number;
   createdAt: number;
-}
-
-export function loadSavedViews(): SavedView[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as SavedView[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function persistSavedViews(views: SavedView[]): void {
-  // Throws on quota-exceeded or storage-disabled; callers surface the error.
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
 }

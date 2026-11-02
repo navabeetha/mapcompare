@@ -14,7 +14,18 @@ html, body, #root {
   position: relative;
   height: calc(100vh - 56px);
   overflow: hidden;
-  display: flex;
+}
+
+/* Curtain comparison. Both maps are full-size and exactly superimposed; the
+   right one is clipped at the splitter so dragging the grip reveals more or
+   less of it WITHOUT either map resizing or re-centring. That is the whole
+   point: the imagery stays pixel-locked to the screen, so you can line both
+   cities up on the centre and swipe between them to read the contrast.
+   clip-path also clips hit-testing, so clicks left of the grip fall through to
+   the map underneath. */
+.map-layer {
+  position: absolute;
+  inset: 0;
 }
 
 .explore-row {
@@ -32,8 +43,7 @@ html, body, #root {
 .map-pane {
   position: relative;
   height: 100%;
-  min-width: 0;
-  flex: 1;
+  width: 100%;
   isolation: isolate;
 }
 
@@ -54,6 +64,26 @@ html, body, #root {
   pointer-events: none;
 }
 .pane-toolbar > * { pointer-events: auto; }
+
+/* With both panes spanning the full width, each pane's chrome is confined to its
+   own half and anchored to the outer edge — otherwise the two search boxes and
+   the two data cards would land on top of each other. At an extreme swipe the
+   hidden map's chrome is clipped away with it, which is the correct behaviour:
+   you are looking at one map. */
+.map-pane--left .pane-toolbar {
+  right: auto;
+  width: calc(50% - 20px);
+}
+
+.map-pane--right .pane-toolbar {
+  left: auto;
+  width: calc(50% - 20px);
+}
+
+.map-pane--right .data-card {
+  left: auto;
+  right: 10px;
+}
 
 .data-card {
   position: absolute;
@@ -81,12 +111,78 @@ html, body, #root {
   z-index: 450;
 }
 
-.measure-panel {
+/* Edit handles. divIcon renders a bare div, so the whole look lives here.
+   box-sizing matters: the border must not push the box past iconSize, or the
+   handle will sit offset from the vertex it represents. */
+.shape-handle {
+  box-sizing: border-box;
+  background: var(--mantine-color-blue-5);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.shape-handle:active {
+  cursor: grabbing;
+}
+
+/* Midpoint handles read as "latent" — smaller and faded until hovered, so a
+   dense outline doesn't look like it has twice as many real vertices. */
+.shape-handle--mid {
+  background: var(--mantine-color-blue-2);
+  border-width: 1px;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.shape-handle--mid:hover {
+  opacity: 1;
+}
+
+/* Measurement labels sit on the shape itself, so they need no pointer target. */
+.leaflet-tooltip.shape-tip {
+  background: rgba(24, 24, 27, 0.82);
+  border: none;
+  box-shadow: none;
+  color: var(--mantine-color-gray-0);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.shape-tip::before {
+  display: none;
+}
+
+/* Bottom-centre stack holding the tool hint above the measurement read-out, so
+   the two can't land on top of each other when both are showing. */
+.readout-stack {
   position: absolute;
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 600;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+
+.readout-stack > * {
+  pointer-events: auto;
+}
+
+.shape-hint {
+  backdrop-filter: blur(6px);
+  background: rgba(36, 36, 36, 0.9) !important;
+  text-align: center;
+}
+
+.measure-panel {
   backdrop-filter: blur(6px);
   background: rgba(36, 36, 36, 0.9) !important;
 }
@@ -100,13 +196,19 @@ html, body, #root {
   background: var(--mantine-color-blue-6);
   opacity: 0.6;
   cursor: ew-resize;
-  z-index: 10;
+  /* Above both map layers and their chrome, below the read-out stack. */
+  z-index: 700;
+  /* Claim touch gestures for the drag; without this the browser scrolls or
+     pans the page instead of handing us pointermove. */
+  touch-action: none;
+  user-select: none;
 }
 
 .splitter:hover {
   opacity: 1;
 }
 
+/* The grip. Drag it to swipe; click it without dragging to snap back to 50%. */
 .splitter::after {
   content: '';
   position: absolute;
@@ -118,4 +220,10 @@ html, body, #root {
   background: var(--mantine-color-blue-6);
   border-radius: 4px;
   opacity: 0.85;
+}
+
+/* Marks the grip as clickable once the split is off-centre, since that is when
+   snapping back is the thing you want. */
+.splitter[data-off-centre='true']::after {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
