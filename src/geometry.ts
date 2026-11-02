@@ -2,8 +2,13 @@ import L from 'leaflet';
 
 const DEG_TO_RAD = Math.PI / 180;
 
-/** WGS-84 equatorial radius, matching the sphere Leaflet's distance() assumes. */
-const EARTH_RADIUS_M = 6_378_137;
+/**
+ * Mean Earth radius — deliberately the same value as Leaflet's `L.CRS.Earth.R`,
+ * which is what `map.distance()` uses. Area and length must be computed on the
+ * same sphere or a polygon's area and its perimeter disagree by ~0.4%, and no
+ * test comparing the two could ever be tight.
+ */
+const EARTH_RADIUS_M = 6_371_008.8;
 
 /**
  * Area of a polygon on the sphere, in m².

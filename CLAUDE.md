@@ -4,13 +4,31 @@ Split-screen tool for comparing cities at **true scale**. Web Mercator inflates
 landmasses with latitude; MapCompare cancels that distortion *between* the two
 maps so one pixel covers the same ground distance on both sides.
 
+## How work gets done here
+
+**Test-first.** New behaviour starts with a failing test. Bug fixes start with a
+regression test that fails on the current code — a fix without one is a fix you
+can't prove worked. Run `/pod` to drive a change through the role agents
+(`test-author` → `implementer` → `qa`), or do it inline for small changes, where
+a pod costs more than it returns.
+
+`src/geometry.ts`, `src/shapes.ts`, `src/scale.ts` and `src/altitude.ts` are pure
+functions and fully testable — anything landing there should arrive with tests.
+The Leaflet-facing modules (`ShapeLayer.ts`, `MapPane.tsx`, `App.tsx`) are mostly
+verified by driving a real browser; see step 2 below.
+
+Tests use vitest under jsdom (Leaflet touches `window` at import time, so even
+pure geometry needs a DOM to be importable). `map.distance` is stubbed from
+`L.CRS.Earth` rather than building a real map — see the top of
+`src/geometry.test.ts`.
+
 ## Pre-push checklist
 
 Run before every push. `npm run check` covers the automated part.
 
-1. **`npm run check`** — typecheck (`tsc -b --force`) + production build. This is
-   the only automated gate in the repo; it must pass clean. `noUnusedLocals` and
-   `noUnusedParameters` are on, so dead code fails the build.
+1. **`npm run check`** — typecheck + `vitest run` + production build. Must pass
+   clean. `noUnusedLocals` and `noUnusedParameters` are on, so dead code fails
+   the build.
 2. **Exercise the change in a browser** — `npm run dev`, then check both
    `localhost:5173/` (tool) and `localhost:5173/?mode=view` (viewer). There are
    no tests, so this is the real verification step. Prefer measuring over
@@ -65,9 +83,12 @@ before `zoomSnap: 0` land exactly scale-matched.
 
 ## Known gaps
 
-- **No tests, linter or formatter.** `scale.ts`, `geometry.ts` and `shapes.ts`
-  are pure functions and the most error-prone code here (area and radius maths) —
-  the obvious place to start if tests are ever added.
+- **No linter or formatter.** Style is held by convention and review only.
+- **The Leaflet-facing code is untested.** `ShapeLayer.ts`, `MapPane.tsx` and
+  `App.tsx` carry most of the behaviour and all of the bugs found so far, but
+  they need a real map to exercise. Testing them means either jsdom-mounting
+  Leaflet or a Playwright layer — neither exists yet, so browser verification
+  stands in.
 - **The MAP basemap is broken.** CartoDB now gates its Voyager tiles behind an
   API key and serves "API KEY REQUIRED" watermarks. Only affects authoring; every
   curated project renders satellite. Fix is a keyless provider in `tileLayers.ts`.
