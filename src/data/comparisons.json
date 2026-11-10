@@ -2,12 +2,14 @@
   {
     "schemaVersion": 2,
     "id": "b70081ca-b4e7-4c03-9c74-08fc5d33bc81",
-    "title": "amsterdam vs venice",
+    "title": "Amsterdam vs Venice",
     "splitPct": 50,
     "grid": {
       "visible": false,
       "overrideMeters": null
     },
+    "labels": true,
+    "borders": [],
     "left": {
       "city": {
         "name": "Amsterdam",
@@ -19,8 +21,8 @@
         "population": 0,
         "curio": "Amsterdam, North Holland, Netherlands"
       },
-      "lat": 52.370197165106504,
-      "lng": 4.903457370003217,
+      "lat": 52.37590336025026,
+      "lng": 4.952010539487751,
       "zoom": 13.5,
       "style": "satellite",
       "shapes": []
@@ -36,9 +38,9 @@
         "population": 0,
         "curio": "Venice, Venezia, Veneto, 30121-30176, Italy"
       },
-      "lat": 45.43515671589556,
-      "lng": 12.336685658707333,
-      "zoom": 13.75,
+      "lat": 45.43875697917051,
+      "lng": 12.295789141623342,
+      "zoom": 13.700760849121808,
       "style": "satellite",
       "shapes": []
     },
