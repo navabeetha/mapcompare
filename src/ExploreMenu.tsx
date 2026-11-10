@@ -17,7 +17,8 @@ interface Props {
   draftViews: Project[];
   onLoad: (id: string) => void;
   onDeleteDraft: (id: string) => void;
-  onExportDrafts: () => void;
+  /** Opens Manage Explore (author only). */
+  onManage: () => void;
 }
 
 export function ExploreMenu({
@@ -26,7 +27,7 @@ export function ExploreMenu({
   draftViews,
   onLoad,
   onDeleteDraft,
-  onExportDrafts,
+  onManage,
 }: Props) {
   const [opened, setOpened] = useState(false);
 
@@ -126,17 +127,18 @@ export function ExploreMenu({
                     ))}
                   </Stack>
                 )}
-                {draftViews.length > 0 && (
-                  <Button
-                    mt="md"
-                    variant="default"
-                    size="xs"
-                    fullWidth
-                    onClick={onExportDrafts}
-                  >
-                    Export drafts to clipboard
-                  </Button>
-                )}
+                <Button
+                  mt="md"
+                  variant="default"
+                  size="xs"
+                  fullWidth
+                  onClick={() => {
+                    setOpened(false);
+                    onManage();
+                  }}
+                >
+                  Manage Explore…
+                </Button>
               </div>
             )}
           </Stack>

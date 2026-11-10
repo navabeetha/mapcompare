@@ -22,7 +22,7 @@ import {
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
-import { LuInfo, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
+import { LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
 // Lucide pair for the map-controls toggle: a wireframe with top bar and side
 // panel (controls showing) vs the same frame left empty (clean canvas).
 import { LuPanelsTopLeft, LuSquare } from 'react-icons/lu';
@@ -47,6 +47,7 @@ import {
 } from './shapes';
 import { AboutModal } from './AboutModal';
 import { SaveViewModal } from './SaveViewModal';
+import { ManageExploreModal } from './ManageExploreModal';
 import { LayersMenu } from './LayersMenu';
 import { ExploreMenu } from './ExploreMenu';
 import {
@@ -59,7 +60,7 @@ import {
   type PaneState,
   type Project,
 } from './projects';
-import { CURATED_VIEWS } from './curatedViews';
+import comparisonsJson from './data/comparisons.json';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
@@ -69,7 +70,12 @@ import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
  * The comparisons that ship with the build. They are still authored in the v1
  * shape, so they come through the same migration as anything in localStorage.
  */
-const CURATED_PROJECTS: Project[] = migrateProjects(CURATED_VIEWS);
+/**
+ * The published Explore list as built into this deploy. The Manage screen
+ * (author only) edits it through GitHub; App keeps a live copy in state so
+ * the author sees a publish at once, before the redeploy lands.
+ */
+const BUILT_PUBLISHED: Project[] = migrateProjects(comparisonsJson as unknown[]);
 
 const HEADER_HEIGHT = 56;
 /** The header is gone in full screen; see `fullscreen` in App. */
@@ -216,6 +222,9 @@ export default function App({ mode, initialProjectId }: AppProps) {
   // they fetch tiles in the background. The header About button reopens it.
   const [aboutOpened, { open: openAbout, close: closeAbout }] = useDisclosure(true);
   const [saveOpened, { open: openSave, close: closeSave }] = useDisclosure(false);
+  const [manageOpened, { open: openManage, close: closeManage }] = useDisclosure(false);
+  /** The Explore list: as built, then as last published from Manage. */
+  const [published, setPublished] = useState<Project[]>(BUILT_PUBLISHED);
   const [projects, setProjects] = useState<Project[]>(() => loadProjects());
   const [pendingTitle, setPendingTitle] = useState('');
 
@@ -569,10 +578,10 @@ export default function App({ mode, initialProjectId }: AppProps) {
     bootedRef.current = true;
 
     const requested = initialProjectId
-      ? CURATED_PROJECTS.find((p) => p.id === initialProjectId) ??
+      ? published.find((p) => p.id === initialProjectId) ??
         projects.find((p) => p.id === initialProjectId)
       : null;
-    const target = requested ?? (isAuthor ? null : CURATED_PROJECTS[0]);
+    const target = requested ?? (isAuthor ? null : published[0]);
     if (target) loadProject(target);
     // Runs once; `projects` and `loadProject` are read at boot and not tracked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -817,9 +826,23 @@ export default function App({ mode, initialProjectId }: AppProps) {
 
   function handleLoadView(id: string) {
     const project =
-      CURATED_PROJECTS.find((p) => p.id === id) ||
+      published.find((p) => p.id === id) ||
       projects.find((p) => p.id === id);
     if (project) loadProject(project);
+  }
+
+  /** Drafts edited in Manage Explore (rename, delete, unpublish back). */
+  function handleDraftsChange(next: Project[]) {
+    setProjects(next);
+    try {
+      persistProjects(next);
+    } catch (err) {
+      notifications.show({
+        title: 'Could not save drafts',
+        message: err instanceof Error ? err.message : 'Could not write to local storage.',
+        color: 'red',
+      });
+    }
   }
 
   function handleDeleteView(id: string) {
@@ -839,29 +862,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
     }
   }
 
-  function handleExportDrafts() {
-    if (projects.length === 0) return;
-    const code = JSON.stringify(projects, null, 2);
-    navigator.clipboard
-      .writeText(code)
-      .then(() => {
-        notifications.show({
-          title: 'Copied to clipboard',
-          message: `${projects.length} draft(s) — paste into src/curatedViews.ts`,
-          color: 'blue',
-        });
-      })
-      .catch(() => {
-        // eslint-disable-next-line no-console
-        console.log('Drafts JSON (clipboard write failed):\n' + code);
-        notifications.show({
-          title: 'Copy failed',
-          message: 'JSON logged to the browser console instead.',
-          color: 'red',
-        });
-      });
-  }
-
   return (
     <AppShell header={{ height: HEADER_HEIGHT, collapsed: fullscreen }} padding={0}>
       <AppShell.Header className="app-header">
@@ -879,6 +879,11 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 {isAuthor && (
                   <Menu.Item leftSection={<LuSave size={16} />} onClick={handleSaveClick}>
                     Save view…
+                  </Menu.Item>
+                )}
+                {isAuthor && (
+                  <Menu.Item leftSection={<LuListChecks size={16} />} onClick={openManage}>
+                    Manage Explore…
                   </Menu.Item>
                 )}
                 <Menu.Item leftSection={<LuInfo size={16} />} onClick={openAbout}>
@@ -903,11 +908,11 @@ export default function App({ mode, initialProjectId }: AppProps) {
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
               <ExploreMenu
                 isAuthor={isAuthor}
-                curatedViews={CURATED_PROJECTS}
+                curatedViews={published}
                 draftViews={projects}
                 onLoad={handleLoadView}
                 onDeleteDraft={handleDeleteView}
-                onExportDrafts={handleExportDrafts}
+                onManage={openManage}
               />
               <LayersMenu
                 gridVisible={gridVisible}
@@ -1192,10 +1197,21 @@ export default function App({ mode, initialProjectId }: AppProps) {
         )}
       </AppShell.Main>
 
+      {isAuthor && (
+        <ManageExploreModal
+          opened={manageOpened}
+          onClose={closeManage}
+          drafts={projects}
+          onDraftsChange={handleDraftsChange}
+          published={published}
+          onPublished={setPublished}
+          onOpen={loadProject}
+        />
+      )}
       <AboutModal
         opened={aboutOpened}
         onClose={closeAbout}
-        comparisons={CURATED_PROJECTS}
+        comparisons={published}
         onPick={handleLoadView}
       />
       <SaveViewModal

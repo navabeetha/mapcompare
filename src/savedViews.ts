@@ -4,7 +4,7 @@ import type { CityPreset } from './presets';
  * The v1 saved-comparison record, superseded by `Project` in `projects.ts`.
  *
  * It survives for two reasons: the seven curated comparisons in
- * `curatedViews.ts` are still written in this shape, and drafts saved before
+ * older published lists were written in this shape, and drafts saved before
  * the schema change are still in localStorage. `migrateProject` upgrades both
  * on read, so nothing had to be rewritten by hand.
  *

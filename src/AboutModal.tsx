@@ -36,7 +36,7 @@ export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalP
     // viewport, and the body is the one part allowed to scroll.
     <Modal.Root opened={opened} onClose={onClose} size="lg" centered>
       <Modal.Overlay />
-      <Modal.Content className="welcome-modal">
+      <Modal.Content className="fixed-modal">
         <Modal.Header>
           <Modal.Title>
             <Text fw={700} fz="h3">
@@ -45,7 +45,7 @@ export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalP
           </Modal.Title>
           <Modal.CloseButton />
         </Modal.Header>
-        <Modal.Body className="welcome-body">
+        <Modal.Body className="fixed-modal-body">
       <Stack gap="md">
         <Text size="sm">
           A split-screen map tool for comparing the true physical size of
@@ -191,7 +191,7 @@ export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalP
 
       </Stack>
         </Modal.Body>
-        <Group className="welcome-footer" justify="flex-end">
+        <Group className="fixed-modal-footer" justify="flex-end">
           <Button onClick={onClose}>Start exploring</Button>
         </Group>
       </Modal.Content>

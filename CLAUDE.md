@@ -39,8 +39,7 @@ Run before every push. `npm run check` covers the automated part.
    fresh load, or against the DOM, before believing it.
 4. **`git status`** — no stray scratch files; `dist/` and `*.tsbuildinfo` stay
    ignored.
-5. **Scan the diff** for debug leftovers. One deliberate `console.log` exists in
-   `handleExportDrafts` as a clipboard-failure fallback; that one is fine.
+5. **Scan the diff** for debug leftovers.
 6. **Remember that pushing to `main` publishes.** `.github/workflows/deploy.yml`
    deploys to GitHub Pages on every push to `main`, so a push is a release.
    Changes to default behaviour are immediately public.
@@ -75,11 +74,21 @@ Run before every push. `npm run check` covers the automated part.
 `Project` (`projects.ts`, `schemaVersion: 2`) is the unit of saved work: both
 framings, `splitPct`, grid settings, per-pane tile style and all measurement
 objects. `migrateProject` upgrades v1 records on read, covering both
-localStorage drafts and the curated comparisons compiled into the build — which
-is why `curatedViews.ts` is still written in the v1 shape and need not be
-rewritten. Loading a project recomputes the second map's zoom from the first via
+localStorage drafts and the published list. Loading a project recomputes the second map's zoom from the first via
 `compensatedZoom` rather than trusting the stored value, so comparisons authored
 before `zoomSnap: 0` land exactly scale-matched.
+
+## Publishing (Manage Explore)
+
+The Explore list is `src/data/comparisons.json`, imported at build time. The
+author edits it from Menu → Manage Explore (tool mode only): changes collect
+in the modal and go out as **one commit** through the GitHub contents API
+(`src/publish.ts`), which starts the Pages deploy (live in ~1–2 minutes). The
+author's fine-grained token (Contents read/write on this repo only) lives in
+that browser's localStorage under `mapcompare:githubToken`; it's never logged,
+put in a URL or committed. A write names the sha it was based on; on a clash it
+re-reads once and writes only if nothing else changed, otherwise it stops.
+Hiding the screen in view mode is not the guard; the token is.
 
 ## Known gaps
 

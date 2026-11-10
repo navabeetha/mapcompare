@@ -297,22 +297,37 @@ html, body, #root {
   background: var(--mantine-color-default-hover);
 }
 
-/* Welcome box: fixed title bar and footer, scrolling middle. */
+/* Modals with a fixed title bar and footer and a scrolling middle (Welcome, Manage Explore). */
 /* Modal.Content puts its className on Mantine's outer wrapper, so the box
    itself is the .mantine-Modal-content inside it. */
-.welcome-modal .mantine-Modal-content {
+.fixed-modal .mantine-Modal-content {
   display: flex;
   flex-direction: column;
   max-height: calc(100dvh - 2 * var(--modal-y-offset, 5dvh));
   overflow: hidden;
 }
-.welcome-body {
+.fixed-modal-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
-.welcome-footer {
+.fixed-modal-footer {
   flex: 0 0 auto;
   padding: 12px var(--mantine-spacing-md);
   border-top: 1px solid var(--mantine-color-default-border);
+}
+
+/* Manage Explore rows and the pending-changes bar. */
+.manage-row {
+  padding: 4px 6px;
+  border-radius: var(--mantine-radius-sm);
+  min-height: 32px;
+}
+.manage-row:hover {
+  background: var(--mantine-color-default-hover);
+}
+.manage-pending {
+  padding: 8px 10px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-yellow-light);
 }

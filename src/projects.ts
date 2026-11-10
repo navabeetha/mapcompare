@@ -74,9 +74,9 @@ function paneFromCity(city: CityPreset): PaneState {
 /**
  * Bring any stored or committed record up to the current schema.
  *
- * Runs over localStorage drafts *and* over the curated views compiled into the
- * build, which is why `curatedViews.ts` never had to be rewritten by hand when
- * the schema grew.
+ * Runs over localStorage drafts *and* over the published list
+ * (src/data/comparisons.json), so older entries never need rewriting by hand
+ * when the schema grows.
  *
  * Returns null for anything unrecognisable rather than throwing, so one corrupt
  * entry can't take out the whole list.
