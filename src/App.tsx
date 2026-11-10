@@ -22,7 +22,7 @@ import {
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
-import { LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
+import { LuImageDown, LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
 // Lucide pair for the map-controls toggle: a wireframe with top bar and side
 // panel (controls showing) vs the same frame left empty (clean canvas).
 import { LuPanelsTopLeft, LuSquare } from 'react-icons/lu';
@@ -65,6 +65,8 @@ import comparisonsJson from './data/comparisons.json';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
+import { exportPng } from './exportImage';
+import { exportTitle } from './exportLayout';
 import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
@@ -167,6 +169,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
    * returns to exactly the state before, including the controls toggle.
    */
   const [fullscreen, setFullscreen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   headerShown = !fullscreen;
 
   const enterFullscreen = useCallback(() => {
@@ -821,6 +824,32 @@ export default function App({ mode, initialProjectId }: AppProps) {
     }
   }
 
+  /** Export PNG: the comparison on screen, with a footer (exportImage.ts). */
+  async function handleExport() {
+    const container = splitContainerRef.current;
+    const left = leftMapRef.current;
+    const right = rightMapRef.current;
+    if (!container || !left || !right) return;
+    setExporting(true);
+    try {
+      await exportPng({
+        container,
+        maps: { left, right },
+        splitPct,
+        title: exportTitle(openProject?.title, leftCity.name, rightCity.name),
+        cities: { left: leftCity, right: rightCity },
+      });
+    } catch (err) {
+      notifications.show({
+        title: 'Export failed',
+        message: err instanceof Error ? err.message : 'The image could not be made.',
+        color: 'red',
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const loadProject = useCallback((project: Project) => {
     setOpenProject(project);
     setLeftCity(project.left.city);
@@ -1061,6 +1090,17 @@ export default function App({ mode, initialProjectId }: AppProps) {
             <Badge variant="light" color="gray" size="sm" radius="sm">
               Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
             </Badge>
+            <Tooltip label="Download as PNG" withArrow position="bottom-end">
+              <ActionIcon
+                size="lg"
+                variant="default"
+                onClick={handleExport}
+                loading={exporting}
+                aria-label="Download as PNG"
+              >
+                <LuImageDown size={18} />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Full screen: just the maps" withArrow position="bottom-end">
               <ActionIcon size="lg" variant="default" onClick={enterFullscreen} aria-label="Full screen">
                 <LuMaximize size={18} />

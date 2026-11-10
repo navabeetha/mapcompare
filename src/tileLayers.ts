@@ -34,6 +34,9 @@ export function createSatelliteLayer(): L.TileLayer {
     {
       maxZoom: 19,
       attribution: 'Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics',
+      // Fetched with CORS (Esri allows any origin), so Export PNG may read
+      // the tiles back. Without it the export canvas is "tainted" and fails.
+      crossOrigin: 'anonymous',
     }
   );
 }

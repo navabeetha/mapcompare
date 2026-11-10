@@ -96,6 +96,16 @@ runs after each load and publish). To change an Explore comparison: open it
 comparison at once, same id) or "Save to drafts", which needs a name not in
 Explore (`draftNameClash`).
 
+## Export PNG
+
+Header → "Download as PNG" (both modes). `exportImage.ts` redraws the maps
+from the DOM onto a canvas in screen order (tiles → MapLibre → shapes SVG →
+grid → measurement labels), clips the right map at the split, and adds a
+footer (`exportLayout.ts`) with the title, both scale bars and the **map
+credits, which must stay** (OSM licence, Esri terms). Reading pixels needs
+CORS: the Esri layer has `crossOrigin: 'anonymous'`; don't remove it. A
+MapLibre (WebGL) canvas is read inside its own `render` event.
+
 ## Known gaps
 
 - **No linter or formatter.** Style is held by convention and review only.
