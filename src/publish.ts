@@ -46,6 +46,15 @@ export function moveItem(list: Project[], id: string, dir: -1 | 1): Project[] {
 }
 
 /**
+ * A comparison is either a draft or in Explore, never both. Drops drafts whose
+ * id is in Explore; returns the same list when nothing overlaps.
+ */
+export function pruneDrafts(drafts: Project[], explore: Project[]): Project[] {
+  const live = new Set(explore.map((p) => p.id));
+  return drafts.some((d) => live.has(d.id)) ? drafts.filter((d) => !live.has(d.id)) : drafts;
+}
+
+/**
  * Drag and drop: puts the item at position `to` in the resulting list
  * (clamped to the ends). Returns the same list if nothing would change.
  */

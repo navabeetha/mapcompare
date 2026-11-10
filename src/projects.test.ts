@@ -28,3 +28,17 @@ describe('src/data/comparisons.json', () => {
     expect(list.length).toBeGreaterThan(0);
   });
 });
+
+import { draftNameClash } from './projects';
+
+describe('draftNameClash: a draft may not share a name with an Explore comparison', () => {
+  const explore = [{ title: 'amsterdam vs venice' }, { title: 'Tokyo Bay vs Paris' }];
+  it('finds a clash ignoring case and extra spaces, and returns the Explore title as shown', () => {
+    expect(draftNameClash('Amsterdam  vs Venice ', explore)).toBe('Amsterdam vs Venice');
+    expect(draftNameClash('tokyo bay vs paris', explore)).toBe('Tokyo Bay vs Paris');
+  });
+  it('is null for a new name', () => {
+    expect(draftNameClash('Amsterdam vs Venice 2', explore)).toBeNull();
+    expect(draftNameClash('Amsterdam vs Venice', [])).toBeNull();
+  });
+});

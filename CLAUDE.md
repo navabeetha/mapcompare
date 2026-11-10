@@ -90,6 +90,12 @@ put in a URL or committed. A write names the sha it was based on; on a clash it
 re-reads once and writes only if nothing else changed, otherwise it stops.
 Hiding the screen in view mode is not the guard; the token is.
 
+A comparison is **either a draft or in Explore, never both** (`pruneDrafts`
+runs after each load and publish). To change an Explore comparison: open it
+(play), edit, then Save view → "Save and update Explore" (publishes that one
+comparison at once, same id) or "Save to drafts", which needs a name not in
+Explore (`draftNameClash`).
+
 ## Known gaps
 
 - **No linter or formatter.** Style is held by convention and review only.

@@ -20,9 +20,9 @@ import {
   LuChevronDown,
   LuCopy,
   LuDownload,
-  LuEye,
   LuGripVertical,
   LuPencil,
+  LuPlay,
   LuRefreshCw,
   LuTrash2,
   LuUpload,
@@ -35,6 +35,7 @@ import {
   getToken,
   moveItem,
   moveTo,
+  pruneDrafts,
   publishItem,
   PublishError,
   removeItem,
@@ -49,6 +50,10 @@ import {
 /**
  * Manage Explore (author only): drafts in this browser, the published list on
  * GitHub, and the moves between them.
+ *
+ * A comparison is either a draft or in Explore, never both. To change one in
+ * Explore, open it (play), edit it on the maps, then Menu → Save view → "Save
+ * and update Explore" (or "Save to drafts" under a new name).
  *
  * Changes to the published list are collected here first and go out together
  * as ONE commit ("Publish changes"), so reordering five rows doesn't start five
@@ -100,6 +105,10 @@ export function ManageExploreModal(p: Props) {
     try {
       const r = await fetchPublished(t);
       setRemote(r);
+      // Tidy up drafts that are also in Explore (from before the two were
+      // kept apart). Explore's copy is the one that's live, so it wins.
+      const pruned = pruneDrafts(p.drafts, r.list);
+      if (pruned !== p.drafts) p.onDraftsChange(pruned);
       // Edits made before connecting were made on the list this page was
       // built with. Keep them only if GitHub still has that same list;
       // otherwise start again from what's really published.
@@ -161,6 +170,9 @@ export function ManageExploreModal(p: Props) {
       const saved = await savePublished(token, remote, working);
       setRemote(saved);
       p.onPublished(saved.list);
+      // Drafts that just went into Explore leave the drafts list.
+      const pruned = pruneDrafts(p.drafts, saved.list);
+      if (pruned !== p.drafts) p.onDraftsChange(pruned);
       notifications.show({
         title: 'Published',
         message: 'Saved to GitHub. The public site updates in about 1–2 minutes.',
@@ -182,7 +194,10 @@ export function ManageExploreModal(p: Props) {
 
   // ---------------------------------------------------------------- rows
 
+  // A draft lined up for Explore moves across at once (and comes back on
+  // Discard); it leaves storage only once the publish succeeds.
   const publishedIds = new Set(working.map((x) => x.id));
+  const draftsShown = p.drafts.filter((d) => !publishedIds.has(d.id));
 
   function titleCell(item: Project, where: 'pub' | 'draft') {
     if (renaming && renaming.id === item.id && renaming.where === where) {
@@ -244,7 +259,7 @@ export function ManageExploreModal(p: Props) {
     );
   }
 
-  const icon = (label: string, Icon: typeof LuEye, onClick: () => void, disabled = false, color = 'gray') => (
+  const icon = (label: string, Icon: typeof LuPlay, onClick: () => void, disabled = false, color = 'gray') => (
     <Tooltip label={label} withArrow openDelay={300}>
       <ActionIcon size="sm" variant="subtle" color={color} onClick={onClick} disabled={disabled} aria-label={label}>
         <Icon size={14} color={color === 'red' ? 'var(--mantine-color-red-6)' : undefined} />
@@ -283,31 +298,21 @@ export function ManageExploreModal(p: Props) {
                 Your drafts · this browser only
               </Text>
               <Stack gap={2}>
-                {p.drafts.length === 0 && (
+                {draftsShown.length === 0 && (
                   <Text size="sm" c="dimmed">
                     No drafts. Set up a comparison and use Menu → Save view.
                   </Text>
                 )}
-                {p.drafts.map((item) => (
+                {draftsShown.map((item) => (
                   <Group key={item.id} gap={4} wrap="nowrap" className="manage-row">
                     {titleCell(item, 'draft')}
-                    {publishedIds.has(item.id) && (
-                      <Badge size="xs" variant="light">
-                        In Explore
-                      </Badge>
-                    )}
                     {confirming?.id === item.id && confirming.where === 'draft' ? (
                       confirmDelete(item, 'draft')
                     ) : (
                       <>
-                        {icon('Open on the maps', LuEye, () => open(item))}
+                        {icon('Open on the maps', LuPlay, () => open(item))}
                         {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'draft', value: item.title }))}
-                        {icon(
-                          publishedIds.has(item.id) ? 'Update the copy in Explore' : 'Add to Explore',
-                          publishedIds.has(item.id) ? LuRefreshCw : LuUpload,
-                          () => setWorking((w) => publishItem(w, item)),
-                          saving,
-                        )}
+                        {icon('Add to Explore', LuUpload, () => setWorking((w) => publishItem(w, item)), saving)}
                         {icon('Delete draft', LuTrash2, () => setConfirming({ id: item.id, where: 'draft' }), false, 'red')}
                       </>
                     )}
@@ -388,7 +393,7 @@ export function ManageExploreModal(p: Props) {
                         confirmDelete(item, 'pub')
                       ) : (
                         <>
-                          {icon('Open on the maps', LuEye, () => open(item))}
+                          {icon('Open on the maps', LuPlay, () => open(item))}
                           {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'pub', value: item.title }), saving)}
                           {icon(
                             'Take out of Explore and back to drafts',

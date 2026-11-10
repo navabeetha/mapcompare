@@ -148,3 +148,14 @@ export function displayTitle(title: string): string {
     .map((w, i) => (i > 0 && SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)))
     .join(' ');
 }
+
+/**
+ * Drafts and Explore comparisons must have different names, so a draft made
+ * from an Explore comparison can't be mistaken for it. Returns the clashing
+ * Explore title (as shown), or null. Case and spacing don't count.
+ */
+export function draftNameClash(title: string, explore: { title: string }[]): string | null {
+  const key = (t: string) => displayTitle(t).toLowerCase();
+  const hit = explore.find((e) => key(e.title) === key(title));
+  return hit ? displayTitle(hit.title) : null;
+}

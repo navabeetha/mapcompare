@@ -57,6 +57,7 @@ import {
   persistProjects,
   SCHEMA_VERSION,
   displayTitle,
+  draftNameClash,
   type PaneState,
   type Project,
 } from './projects';
@@ -64,6 +65,7 @@ import comparisonsJson from './data/comparisons.json';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
+import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
 /**
@@ -686,19 +688,25 @@ export default function App({ mode, initialProjectId }: AppProps) {
     };
   }, [captureAnchors, repinAnchors]);
 
+  // The comparison on screen, if it was opened from Explore. Saving it then
+  // offers "Save and update Explore" as well as "Save to drafts".
+  const openFromExplore = openProject ? published.find((x) => x.id === openProject.id) ?? null : null;
+  const [updatingExplore, setUpdatingExplore] = useState(false);
+
   function handleSaveClick() {
     const left = leftQuery.trim() || leftCity.name;
     const right = rightQuery.trim() || rightCity.name;
-    setPendingTitle(`${left} vs ${right}`);
+    // An Explore comparison keeps its name for "update"; saving it as a draft
+    // asks for a new one (draftNameClash).
+    setPendingTitle(openFromExplore ? displayTitle(openFromExplore.title) : `${left} vs ${right}`);
     openSave();
   }
 
-  function handleConfirmSave(title: string, pins: { left: Pin; right: Pin }) {
+  /** Everything on screen as a Project: both framings, split, grid, layers, shapes, pins. */
+  function captureProject(title: string, pins: { left: Pin; right: Pin }, id: string, createdAt: number): Project | null {
     const leftMap = leftMapRef.current;
     const rightMap = rightMapRef.current;
-    if (!leftMap || !rightMap) return;
-
-    closeSave();
+    if (!leftMap || !rightMap) return null;
 
     // The place under each map's pin spot on this screen, saved with the pin.
     const pinFor = (side: Side, map: L.Map): PaneState['pin'] => {
@@ -710,13 +718,12 @@ export default function App({ mode, initialProjectId }: AppProps) {
       return { ...spot, lat: place.lat, lng: place.lng };
     };
 
-    try {
-      // Capture the live state of everything a reader needs to see the same
-      // comparison: both framings, the split between them, the grid, the tile
-      // styles and every measurement object.
-      const project: Project = {
+    // Capture the live state of everything a reader needs to see the same
+    // comparison: both framings, the split between them, the grid, the tile
+    // styles and every measurement object.
+    return {
         schemaVersion: SCHEMA_VERSION,
-        id: createProjectId(),
+        id,
         title,
         splitPct,
         grid: { visible: gridVisible, overrideMeters: gridOverrideMeters },
@@ -740,9 +747,17 @@ export default function App({ mode, initialProjectId }: AppProps) {
           shapes: rightShapes,
           pin: pinFor('right', rightMap),
         },
-        createdAt: Date.now(),
+        createdAt,
       };
+  }
 
+  function handleConfirmSave(title: string, pins: { left: Pin; right: Pin }) {
+    // Belt and braces: the dialog already blocks a name that's in Explore.
+    if (draftNameClash(title, published)) return;
+    const project = captureProject(title, pins, createProjectId(), Date.now());
+    if (!project) return;
+    closeSave();
+    try {
       const next = [project, ...projects];
       setProjects(next);
       persistProjects(next);
@@ -762,6 +777,43 @@ export default function App({ mode, initialProjectId }: AppProps) {
             : 'Could not write to local storage.',
         color: 'red',
       });
+    }
+  }
+
+  /**
+   * "Save and update Explore": replaces the open Explore comparison with what's
+   * on screen, as one commit straight away (live in ~1–2 minutes). Uses the
+   * token connected in Manage Explore; reads the latest list first so it
+   * never overwrites someone else's newer change.
+   */
+  async function handleUpdateExplore(title: string, pins: { left: Pin; right: Pin }) {
+    const token = getToken();
+    if (!token || !openFromExplore) return;
+    const project = captureProject(title, pins, openFromExplore.id, openFromExplore.createdAt);
+    if (!project) return;
+    setUpdatingExplore(true);
+    try {
+      const remote = await fetchPublished(token);
+      if (!remote.list.some((x) => x.id === project.id)) {
+        throw new PublishError('This comparison is no longer in Explore, so there is nothing to update. Save it to drafts instead.');
+      }
+      const saved = await savePublished(token, remote, publishItem(remote.list, project));
+      setPublished(saved.list);
+      setOpenProject(project);
+      closeSave();
+      notifications.show({
+        title: 'Explore updated',
+        message: `"${displayTitle(title)}" is saved to GitHub. The public site updates in about 1–2 minutes.`,
+        color: 'green',
+      });
+    } catch (err) {
+      notifications.show({
+        title: 'Not updated',
+        message: err instanceof PublishError ? err.message : "Couldn't reach GitHub. Nothing was changed.",
+        color: 'red',
+      });
+    } finally {
+      setUpdatingExplore(false);
     }
   }
 
@@ -1204,6 +1256,11 @@ export default function App({ mode, initialProjectId }: AppProps) {
         }}
         onSave={handleConfirmSave}
         onClose={closeSave}
+        explore={published}
+        fromExplore={!!openFromExplore}
+        canUpdateExplore={!!getToken()}
+        onUpdateExplore={handleUpdateExplore}
+        updating={updatingExplore}
       />
     </AppShell>
   );

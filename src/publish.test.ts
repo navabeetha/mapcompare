@@ -7,6 +7,7 @@ import {
   moveItem,
   moveTo,
   parseComparisons,
+  pruneDrafts,
   publishItem,
   removeItem,
   renameItem,
@@ -67,6 +68,18 @@ describe('list edits never change the list they are given', () => {
     expect(ids(moveTo(list, 'c', -5))).toEqual(['c', 'a', 'b']);
     expect(moveTo(list, 'zz', 0)).toBe(list);
     expect(moveTo(list, 'b', 1)).toBe(list);
+  });
+});
+
+describe('pruneDrafts: a comparison is either a draft or in Explore, never both', () => {
+  it('drops drafts whose id is in Explore and keeps the rest in order', () => {
+    const drafts = [p('x'), p('a'), p('y'), p('b')];
+    expect(ids(pruneDrafts(drafts, [p('a'), p('b'), p('c')]))).toEqual(['x', 'y']);
+    expect(ids(drafts)).toEqual(['x', 'a', 'y', 'b']);
+  });
+  it('returns the same list when nothing overlaps, so callers can skip a save', () => {
+    const drafts = [p('x'), p('y')];
+    expect(pruneDrafts(drafts, [p('a')])).toBe(drafts);
   });
 });
 
