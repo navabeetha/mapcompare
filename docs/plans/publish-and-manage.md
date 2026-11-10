@@ -1,6 +1,27 @@
 # Plan: publish directly and manage Explore
 
-Status: agreed 2026-11-10. **Start after the labels layer is done.**
+Status: **steps 1–3 shipped 2026-11-10** (live; publishing tested end to
+end with a reorder and its revert). Next stage starts at "Next" below.
+
+## Shipped (2026-11-10)
+
+- The Explore list is `src/data/comparisons.json`. Manage Explore (Menu, tool
+  mode) publishes it as one commit with the author's fine-grained token.
+- Manage Explore: drag to reorder, upload icon (draft → Explore), download
+  icon (Explore → drafts), red delete with a confirm, copy drafts or the
+  Explore list as JSON, Reload and Forget token in the GitHub badge menu.
+- A comparison is a draft or in Explore, never both. To edit an Explore
+  comparison: play, then edit, then Save view → "Save and update Explore"
+  (publishes at once), or "Save to drafts" under a new name.
+- Layers → Annotations hides all shapes and measurements. Notes join it.
+- Still to see once in real use: a "Save and update Explore" commit.
+
+## Next
+
+1. **Export:** completes the cycle Featured → Explore → create → publish.
+   Not yet designed.
+2. **Embed:** only if it's cheap.
+3. Step 4 (notes), then step 5 (city limits), below.
 
 ## Goal
 
