@@ -5,11 +5,11 @@ import {
   AppShell,
   Group,
   Title,
-  Button,
   Badge,
   Paper,
   Text,
   Divider,
+  Menu,
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
@@ -22,6 +22,10 @@ import {
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
+import { LuInfo, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
+// Lucide pair for the map-controls toggle: a wireframe with top bar and side
+// panel (controls showing) vs the same frame left empty (clean canvas).
+import { LuPanelsTopLeft, LuSquare } from 'react-icons/lu';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { MapPane, type MapPaneHandle } from './MapPane';
@@ -51,6 +55,7 @@ import {
   migrateProjects,
   persistProjects,
   SCHEMA_VERSION,
+  displayTitle,
   type PaneState,
   type Project,
 } from './projects';
@@ -67,7 +72,9 @@ import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 const CURATED_PROJECTS: Project[] = migrateProjects(CURATED_VIEWS);
 
 const HEADER_HEIGHT = 56;
-const paneHeightPx = () => window.innerHeight - HEADER_HEIGHT;
+/** The header is gone in full screen; see `fullscreen` in App. */
+let headerShown = true;
+const paneHeightPx = () => window.innerHeight - (headerShown ? HEADER_HEIGHT : 0);
 
 type Side = 'left' | 'right';
 
@@ -140,6 +147,59 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const [gridVisible, setGridVisible] = useState(false);
   /** Place-name labels on both maps (Layers menu). Saved with a project. */
   const [labelsVisible, setLabelsVisible] = useState(true);
+  /** Hides the on-map controls (search, city cards, zoom) for a clean view.
+   *  Not saved: it's a viewing preference, not part of a comparison. */
+  const [mapUiHidden, setMapUiHidden] = useState(false);
+  /**
+   * Full screen: just the two maps. The header and the map controls go, and
+   * the browser goes full screen where it can. A soft close button (or Esc)
+   * returns to exactly the state before, including the controls toggle.
+   */
+  const [fullscreen, setFullscreen] = useState(false);
+  headerShown = !fullscreen;
+
+  const enterFullscreen = useCallback(() => {
+    setFullscreen(true);
+    // Not every browser allows it (iPhone Safari doesn't); the in-page full
+    // screen still works without it.
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }, []);
+  const exitFullscreen = useCallback(() => {
+    setFullscreen(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+  }, []);
+  // Esc (or the browser's own exit) leaves browser full screen; follow it.
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) setFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  // Esc leaves full screen. In browser full screen the browser usually takes
+  // Esc itself (and fullscreenchange above follows it); this covers the
+  // in-page full screen and any Esc that does reach the page.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitFullscreen();
+    };
+    // Capture phase: focus is often still on the (hidden) Full screen button,
+    // and its tooltip stops Esc from bubbling up to window.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [fullscreen, exitFullscreen]);
+  // The header coming or going changes the maps' height, even when the browser
+  // window doesn't resize (in-page full screen). Re-measure and re-pin, the
+  // same way a window resize does.
+  const firstFullscreenRun = useRef(true);
+  useEffect(() => {
+    if (firstFullscreenRun.current) {
+      firstFullscreenRun.current = false;
+      return;
+    }
+    setPinToken((t) => t + 1);
+  }, [fullscreen]);
   /** Border groups on both maps (Layers menu). Off by default. Never country borders. */
   const [borders, setBorders] = useState<BorderLevel[]>([]);
   const [gridStepPx, setGridStepPx] = useState(100);
@@ -803,16 +863,35 @@ export default function App({ mode, initialProjectId }: AppProps) {
   }
 
   return (
-    <AppShell header={{ height: HEADER_HEIGHT }} padding={0}>
+    <AppShell header={{ height: HEADER_HEIGHT, collapsed: fullscreen }} padding={0}>
       <AppShell.Header className="app-header">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap={0} wrap="nowrap" align="center">
+            {/* The "meta" actions (Save, About) live in this menu, so the header
+                keeps to what you use on the maps. */}
+            <Menu position="bottom-start" shadow="md" width={200} withArrow>
+              <Menu.Target>
+                <ActionIcon size="lg" variant="subtle" color="gray" mr={10} aria-label="Menu">
+                  <LuMenu size={20} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {isAuthor && (
+                  <Menu.Item leftSection={<LuSave size={16} />} onClick={handleSaveClick}>
+                    Save view…
+                  </Menu.Item>
+                )}
+                <Menu.Item leftSection={<LuInfo size={16} />} onClick={openAbout}>
+                  About MapCompare
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
             <Title order={4}>MapCompare</Title>
             {/* View mode leads with the title of the comparison that's open. */}
             {!isAuthor && openProject && (
               <Group gap={8} wrap="nowrap" align="baseline" ml={32}>
-                <Text fw={600} size="sm" tt="capitalize">
-                  {openProject.title}
+                <Text fw={600} size="sm">
+                  {displayTitle(openProject.title)}
                 </Text>
                 {openProject.description && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
@@ -822,6 +901,14 @@ export default function App({ mode, initialProjectId }: AppProps) {
               </Group>
             )}
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
+              <ExploreMenu
+                isAuthor={isAuthor}
+                curatedViews={CURATED_PROJECTS}
+                draftViews={projects}
+                onLoad={handleLoadView}
+                onDeleteDraft={handleDeleteView}
+                onExportDrafts={handleExportDrafts}
+              />
               <LayersMenu
                 gridVisible={gridVisible}
                 onGridVisibleChange={setGridVisible}
@@ -835,6 +922,21 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 borders={borders}
                 onBordersChange={setBorders}
               />
+              {/* Yellow while hidden, so it's obvious the controls are tucked away. */}
+              <Tooltip label={mapUiHidden ? 'Show map controls' : 'Hide map controls'} withArrow>
+                <ActionIcon
+                  size="lg"
+                  ml={-4}
+                  variant={mapUiHidden ? 'filled' : 'default'}
+                  color={mapUiHidden ? 'yellow.4' : undefined}
+                  c={mapUiHidden ? 'dark' : undefined}
+                  onClick={() => setMapUiHidden((h) => !h)}
+                  aria-label={mapUiHidden ? 'Show map controls' : 'Hide map controls'}
+                  aria-pressed={mapUiHidden}
+                >
+                  {mapUiHidden ? <LuSquare size={18} /> : <LuPanelsTopLeft size={18} />}
+                </ActionIcon>
+              </Tooltip>
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
@@ -900,38 +1002,29 @@ export default function App({ mode, initialProjectId }: AppProps) {
                   </Tooltip>
                 )}
               </Group>
-              <Divider
-                orientation="vertical"
-                style={{ height: 24, alignSelf: 'center' }}
-              />
-              <Badge variant="light" color="gray" size="sm" radius="sm">
-                Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
-              </Badge>
             </Group>
           </Group>
           <Group gap="sm" wrap="nowrap" align="center">
-            <ExploreMenu
-              isAuthor={isAuthor}
-              curatedViews={CURATED_PROJECTS}
-              draftViews={projects}
-              onLoad={handleLoadView}
-              onDeleteDraft={handleDeleteView}
-              onExportDrafts={handleExportDrafts}
-            />
-            {isAuthor && (
-              <Button variant="default" size="sm" onClick={handleSaveClick}>
-                Save
-              </Button>
-            )}
-            <Button variant="default" size="sm" onClick={openAbout}>
-              About
-            </Button>
+            {/* A read-out, not a tool, so it sits with Full screen on the right. */}
+            <Badge variant="light" color="gray" size="sm" radius="sm">
+              Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
+            </Badge>
+            <Tooltip label="Full screen: just the maps" withArrow position="bottom-end">
+              <ActionIcon size="lg" variant="default" onClick={enterFullscreen} aria-label="Full screen">
+                <LuMaximize size={18} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </AppShell.Header>
 
       <AppShell.Main>
-        <div className="split-container" ref={splitContainerRef}>
+        <div
+          className="split-container"
+          ref={splitContainerRef}
+          data-map-ui-hidden={mapUiHidden || fullscreen || undefined}
+          data-fullscreen={fullscreen || undefined}
+        >
           {/* Both layers are full-size and superimposed; only the right one is
               clipped. Order matters — the right layer must paint over the left. */}
           <div className="map-layer">
@@ -1083,9 +1176,28 @@ export default function App({ mode, initialProjectId }: AppProps) {
           )}
           </div>
         </div>
+        {fullscreen && (
+          <Tooltip label="Exit full screen (Esc)" withArrow position="bottom-end">
+            <ActionIcon
+              className="fullscreen-exit"
+              size="xl"
+              radius="xl"
+              variant="default"
+              onClick={exitFullscreen}
+              aria-label="Exit full screen"
+            >
+              <LuX size={20} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </AppShell.Main>
 
-      <AboutModal opened={aboutOpened} onClose={closeAbout} />
+      <AboutModal
+        opened={aboutOpened}
+        onClose={closeAbout}
+        comparisons={CURATED_PROJECTS}
+        onPick={handleLoadView}
+      />
       <SaveViewModal
         opened={saveOpened}
         defaultTitle={pendingTitle}

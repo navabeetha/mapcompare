@@ -18,6 +18,10 @@ html, body, #root {
      blue split bar showed through the Welcome modal. */
   isolation: isolate;
   height: calc(100vh - 56px);
+}
+/* Full screen: no header, so the maps take the whole viewport. */
+.split-container[data-fullscreen] {
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -83,6 +87,8 @@ html, body, #root {
 .map-pane--right .pane-toolbar {
   left: auto;
   width: calc(50% - 20px);
+  /* The right map's search sits against the right edge, mirroring the left. */
+  justify-content: flex-end;
 }
 
 .map-pane--right .data-card {
@@ -249,4 +255,64 @@ html, body, #root {
 .pin-cell[data-on='true'] {
   background: var(--mantine-color-blue-6);
   border-color: var(--mantine-color-blue-6);
+}
+
+/* "Hide map controls" (header eye button): a clean view of the two maps. Hides
+   the per-map search, the city cards and the zoom buttons. The scale bars stay,
+   because they're part of the comparison, and so do the map credits, which the
+   tile licences require. */
+.split-container[data-map-ui-hidden] .pane-toolbar,
+.split-container[data-map-ui-hidden] .data-card,
+.split-container[data-map-ui-hidden] .leaflet-control-zoom {
+  display: none;
+}
+
+/* Full screen's way back: a soft round close button where the header's last
+   button was. Quiet until hovered, so it doesn't sit on the comparison. */
+.fullscreen-exit {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  opacity: 0.55;
+  transition: opacity 150ms;
+  backdrop-filter: blur(6px);
+}
+.fullscreen-exit:hover,
+.fullscreen-exit:focus-visible {
+  opacity: 1;
+}
+
+/* Welcome box: the one-click featured comparisons. */
+.welcome-pick {
+  padding: 10px 12px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  transition: border-color 120ms, background 120ms;
+}
+.welcome-pick:hover,
+.welcome-pick:focus-visible {
+  border-color: var(--mantine-color-blue-5);
+  background: var(--mantine-color-default-hover);
+}
+
+/* Welcome box: fixed title bar and footer, scrolling middle. */
+/* Modal.Content puts its className on Mantine's outer wrapper, so the box
+   itself is the .mantine-Modal-content inside it. */
+.welcome-modal .mantine-Modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2 * var(--modal-y-offset, 5dvh));
+  overflow: hidden;
+}
+.welcome-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.welcome-footer {
+  flex: 0 0 auto;
+  padding: 12px var(--mantine-spacing-md);
+  border-top: 1px solid var(--mantine-color-default-border);
 }

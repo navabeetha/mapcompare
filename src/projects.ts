@@ -134,3 +134,17 @@ export function persistProjects(projects: Project[]): void {
   // Throws on quota-exceeded or storage-disabled; callers surface the error.
   localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 }
+
+/**
+ * A title for display: each word capitalised, except small joining words such
+ * as "vs", "and" and "of" (after the first word). Titles are stored however
+ * they were typed, often all lower case.
+ */
+export function displayTitle(title: string): string {
+  const SMALL = new Set(['vs', 'vs.', 'and', 'of', 'the', 'in', 'on', 'to', 'a']);
+  return title
+    .trim()
+    .split(/\s+/)
+    .map((w, i) => (i > 0 && SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
+}

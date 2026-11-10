@@ -8,7 +8,8 @@ import {
   UnstyledButton,
   Group,
 } from '@mantine/core';
-import type { Project } from './projects';
+import { LuGlobe } from 'react-icons/lu';
+import { displayTitle, type Project } from './projects';
 
 interface Props {
   isAuthor: boolean;
@@ -38,13 +39,21 @@ export function ExploreMenu({
     <Popover
       opened={opened}
       onChange={setOpened}
-      position="bottom-end"
+      position="bottom-start"
       withArrow
       shadow="md"
       width={300}
     >
       <Popover.Target>
-        <Button size="sm" onClick={() => setOpened((o) => !o)}>
+        {/* 34 px tall, like the size-lg icon buttons beside it. */}
+        <Button
+          size="sm"
+          h={34}
+          px={12}
+          leftSection={<LuGlobe size={18} />}
+          styles={{ section: { marginInlineEnd: 6 } }}
+          onClick={() => setOpened((o) => !o)}
+        >
           Explore
         </Button>
       </Popover.Target>
@@ -69,8 +78,8 @@ export function ExploreMenu({
                       onClick={() => handleLoadAndClose(v.id)}
                       className="explore-row"
                     >
-                      <Text size="sm" tt="capitalize">
-                        {v.title}
+                      <Text size="sm" >
+                        {displayTitle(v.title)}
                       </Text>
                     </UnstyledButton>
                   ))}
@@ -96,8 +105,8 @@ export function ExploreMenu({
                         className="explore-row"
                       >
                         <Group justify="space-between" wrap="nowrap">
-                          <Text size="sm" tt="capitalize">
-                            {v.title}
+                          <Text size="sm" >
+                            {displayTitle(v.title)}
                           </Text>
                           <Text
                             component="span"

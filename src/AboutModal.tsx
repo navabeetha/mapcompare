@@ -5,34 +5,47 @@ import {
   List,
   Anchor,
   Stack,
-  Divider,
   Code,
   Accordion,
   Button,
   Group,
+  SimpleGrid,
+  UnstyledButton,
 } from '@mantine/core';
+import { displayTitle, type Project } from './projects';
+
+/** How many featured comparisons the Welcome box offers. */
+const PICKS = 6;
 
 interface AboutModalProps {
   opened: boolean;
   onClose: () => void;
+  /** Featured comparisons. The first few are offered as one-click starts. */
+  comparisons: Project[];
+  /** Opens one (the modal closes itself after). */
+  onPick: (id: string) => void;
 }
 
-export function AboutModal({ opened, onClose }: AboutModalProps) {
+export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalProps) {
   // Note: the `title` below is styled Text rather than a <Title>. Mantine's
   // Modal.Title is already an <h2>, so a <Title order={3}> inside it nests an
   // <h3> within an <h2> — invalid HTML, and React warns about it.
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Text fw={700} fz="h3">
-          Welcome to MapCompare
-        </Text>
-      }
-      size="lg"
-      centered
-    >
+    // Built from Modal's parts so the title bar and the footer stay put and only
+    // the content between them scrolls: the content is a column capped at the
+    // viewport, and the body is the one part allowed to scroll.
+    <Modal.Root opened={opened} onClose={onClose} size="lg" centered>
+      <Modal.Overlay />
+      <Modal.Content className="welcome-modal">
+        <Modal.Header>
+          <Modal.Title>
+            <Text fw={700} fz="h3">
+              Welcome to MapCompare
+            </Text>
+          </Modal.Title>
+          <Modal.CloseButton />
+        </Modal.Header>
+        <Modal.Body className="welcome-body">
       <Stack gap="md">
         <Text size="sm">
           A split-screen map tool for comparing the true physical size of
@@ -41,6 +54,31 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
           equator — Greenland looks as big as Africa even though Africa is
           ~14× larger.
         </Text>
+
+        {/* One click to something worth seeing, before any of the how-to. */}
+        {comparisons.length > 0 && (
+          <div>
+            <Title order={6} c="blue" tt="uppercase" mb={6}>
+              Jump into a comparison
+            </Title>
+            <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="xs">
+              {comparisons.slice(0, PICKS).map((c) => (
+                <UnstyledButton
+                  key={c.id}
+                  className="welcome-pick"
+                  onClick={() => {
+                    onPick(c.id);
+                    onClose();
+                  }}
+                >
+                  <Text size="sm" fw={600} lineClamp={2}>
+                    {displayTitle(c.title)}
+                  </Text>
+                </UnstyledButton>
+              ))}
+            </SimpleGrid>
+          </div>
+        )}
 
         <div>
           <Title order={6} c="blue" tt="uppercase" mb={6}>
@@ -151,11 +189,12 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
           it compares places rather than drawing lines between them.
         </Text>
 
-        <Divider />
-        <Group justify="flex-end">
+      </Stack>
+        </Modal.Body>
+        <Group className="welcome-footer" justify="flex-end">
           <Button onClick={onClose}>Start exploring</Button>
         </Group>
-      </Stack>
-    </Modal>
+      </Modal.Content>
+    </Modal.Root>
   );
 }
