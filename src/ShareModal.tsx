@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Center, Divider, Group, Loader, Menu, Modal, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Center, Divider, Group, Loader, Menu, Modal, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { LuChevronDown, LuCopy, LuDownload, LuLink, LuX } from 'react-icons/lu';
 import { downloadBlob, type RenderedImage } from './exportImage';
@@ -10,9 +10,9 @@ import { fileSize, imageInfo, type ImageFormat } from './exportLayout';
  *   - Image: a preview (exportImage.ts) with Copy image and a Download menu
  *     offering PNG (lossless, large) or JPEG (much smaller), each with its
  *     size. Both come from the same render as the preview, not a second one.
- *   - Link: for a comparison in Explore, its public link (`?project=<id>`),
- *     which opens it as published. Other views aren't stored anywhere a link
- *     could point to, so the modal says so instead.
+ *   - Link: a link to exactly what's on screen, with the whole view packed
+ *     into it (viewLink.ts, `#v=`). For a comparison in Explore there's also
+ *     its short link (`?project=<id>`), which opens it as published.
  * Later sections (embed code, more formats) slot in below.
  *
  * The image is made each time the modal opens, from the maps as they are
@@ -24,6 +24,8 @@ interface Props {
   onClose: () => void;
   /** Makes the image of the comparison on screen. */
   render: () => Promise<RenderedImage>;
+  /** Makes a link to exactly what's on screen. */
+  makeViewLink: () => Promise<string>;
   /** The open comparison's public link, if it's in Explore. */
   link: { url: string; title: string } | null;
 }
@@ -37,7 +39,9 @@ const FORMATS: { format: ImageFormat; label: string; hint: string }[] = [
 /** Copying an image needs the async clipboard and ClipboardItem (most modern browsers). */
 const canCopyImage = typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
 
-export function ShareModal({ opened, onClose, render, link }: Props) {
+export function ShareModal({ opened, onClose, render, makeViewLink, link }: Props) {
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [linkKind, setLinkKind] = useState<'view' | 'explore'>('view');
   const [image, setImage] = useState<RenderedImage | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +66,15 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
     }
   }
 
+  // The view link is made fresh each time, from the maps as they are now.
+  useEffect(() => {
+    if (!opened) return;
+    setViewUrl(null);
+    setLinkKind('view');
+    makeViewLink().then(setViewUrl, () => setViewUrl(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
+
   useEffect(() => {
     if (opened) void make();
     else {
@@ -78,11 +91,17 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
     if (!opened) setUrl(null);
   }, [opened]);
 
+  const shownUrl = linkKind === 'explore' && link ? link.url : viewUrl;
+
   async function copyLink() {
-    if (!link) return;
+    if (!shownUrl) return;
     try {
-      await navigator.clipboard.writeText(link.url);
-      notifications.show({ title: 'Link copied', message: `Opens "${link.title}" on MapCompare.`, color: 'blue' });
+      await navigator.clipboard.writeText(shownUrl);
+      notifications.show({
+        title: 'Link copied',
+        message: linkKind === 'explore' && link ? `Opens "${link.title}" on MapCompare.` : 'Opens this view on MapCompare.',
+        color: 'blue',
+      });
     } catch {
       notifications.show({ title: 'Copy failed', message: 'The browser blocked the clipboard. Select the link and copy it.', color: 'red' });
     }
@@ -169,30 +188,36 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
           Link
         </Text>
-        {link ? (
-          <>
-            <Group gap="xs" wrap="nowrap">
-              <TextInput
-                size="xs"
-                style={{ flex: 1 }}
-                value={link.url}
-                readOnly
-                onFocus={(e) => e.currentTarget.select()}
-                aria-label="Link to this comparison"
-              />
-              <Button size="xs" variant="default" leftSection={<LuLink size={14} />} onClick={copyLink}>
-                Copy link
-              </Button>
-            </Group>
-            <Text size="xs" c="dimmed">
-              Opens “{link.title}” as it’s saved in Explore, so changes you’ve made since opening it aren’t included.
-            </Text>
-          </>
-        ) : (
-          <Text size="xs" c="dimmed">
-            Links work for comparisons in Explore. This view isn’t one of them, so share the image instead.
-          </Text>
+        {link && (
+          <SegmentedControl
+            size="xs"
+            value={linkKind}
+            onChange={(v) => setLinkKind(v as 'view' | 'explore')}
+            data={[
+              { value: 'view', label: 'This view' },
+              { value: 'explore', label: 'Explore comparison' },
+            ]}
+          />
         )}
+        <Group gap="xs" wrap="nowrap">
+          <TextInput
+            size="xs"
+            style={{ flex: 1 }}
+            value={shownUrl ?? ''}
+            placeholder="Making the link…"
+            readOnly
+            onFocus={(e) => e.currentTarget.select()}
+            aria-label="Link to share"
+          />
+          <Button size="xs" variant="default" leftSection={<LuLink size={14} />} onClick={copyLink} disabled={!shownUrl}>
+            Copy link
+          </Button>
+        </Group>
+        <Text size="xs" c="dimmed">
+          {linkKind === 'explore' && link
+            ? `Opens “${link.title}” as it’s saved in Explore, so changes you’ve made since opening it aren’t included.`
+            : 'Opens exactly what’s on screen: both maps, the split, layers and shapes. The view is stored in the link itself, so it’s long but needs no account.'}
+        </Text>
       </Stack>
     </Modal>
   );

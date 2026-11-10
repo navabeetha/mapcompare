@@ -1,3 +1,5 @@
+import { readViewHash } from './viewLink';
+
 /**
  * Which half of the app you're looking at.
  *
@@ -25,6 +27,11 @@ export function resolveMode(): AppMode {
   const requested = new URLSearchParams(window.location.search).get('mode');
   if (requested === 'tool' || requested === 'view') return requested;
   return import.meta.env.DEV ? 'tool' : 'view';
+}
+
+/** A shared view to open on load, from `#v=<code>` (viewLink.ts). */
+export function resolveViewCode(): string | null {
+  return readViewHash(window.location.hash);
 }
 
 /** Project id to open on load, from `?project=<id>`. */

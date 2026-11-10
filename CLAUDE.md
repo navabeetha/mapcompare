@@ -123,9 +123,13 @@ Explore (`draftNameClash`).
 Header → Share (both modes) opens `ShareModal.tsx`: a preview of the PNG with
 Copy image (PNG) and a Download menu: PNG or JPEG (quality 0.9), both encoded
 from the same render as the preview, sizes shown. Then a Link section:
-for a comparison in Explore, its public `?project=<id>` link (`shareLink` in
-`exportLayout.ts`) with Copy link; other views can't be linked yet and the
-modal says so. Later sections (embed, more formats) go in this modal. `exportImage.ts` (`renderComparison`) redraws the maps
+"This view" links to exactly what's on screen, with the whole view packed
+into the URL hash (`#v=1.<code>`, `viewLink.ts`: rounded JSON, deflate,
+base64url; the hash never reaches a server). A comparison in Explore can
+also share its short `?project=<id>` link. Opening a `#v=` link at startup
+(`resolveViewCode` in `mode.ts`) wins over `?project=`; decoded views go
+through `migrateProject` plus type checks and a 256 KB unpack cap, since
+anyone can craft one. Keep old `#v=` versions decodable once shared. Later sections (embed, more formats) go in this modal. `exportImage.ts` (`renderComparison`) redraws the maps
 from the DOM onto a canvas in screen order (tiles → MapLibre → shapes SVG →
 grid → measurement labels), clips the right map at the split, and adds a
 footer (`exportLayout.ts`) with the title, both scale bars and the **map

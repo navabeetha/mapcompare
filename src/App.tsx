@@ -70,6 +70,7 @@ import { toMapStyle, type MapStyle } from './tileLayers';
 import { renderComparison } from './exportImage';
 import { ShareModal } from './ShareModal';
 import { exportTitle, shareLink } from './exportLayout';
+import { decodeView, encodeView, viewLink } from './viewLink';
 import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
@@ -135,9 +136,11 @@ interface AppProps {
   mode: AppMode;
   /** Project to open on load, from `?project=`. Viewer falls back to the first curated one. */
   initialProjectId: string | null;
+  /** A shared view to open on load, from `#v=` (viewLink.ts). Wins over `?project=`. */
+  initialViewCode: string | null;
 }
 
-export default function App({ mode, initialProjectId }: AppProps) {
+export default function App({ mode, initialProjectId, initialViewCode }: AppProps) {
   // The two modes have the same tools: grid, shapes, per-map search and tile
   // style. The only difference is that the tool can save. Save and the local
   // Drafts list are reserved for the author for now. Letting the public save,
@@ -613,6 +616,22 @@ export default function App({ mode, initialProjectId }: AppProps) {
     if (bootedRef.current) return;
     bootedRef.current = true;
 
+    // A shared view link (`#v=`). Decoding is async; until it lands the
+    // default cities show, then the view loads like any other project. A
+    // broken link says so and falls back to the usual first screen.
+    if (initialViewCode) {
+      void decodeView(initialViewCode).then((view) => {
+        if (view) return loadProject(view);
+        notifications.show({
+          title: 'This link could not be opened',
+          message: 'It may have been cut short when it was copied. Ask for it again.',
+          color: 'red',
+        });
+        if (!isAuthor && published[0]) loadProject(published[0]);
+      });
+      return;
+    }
+
     const requested = initialProjectId
       ? published.find((p) => p.id === initialProjectId) ??
         projects.find((p) => p.id === initialProjectId)
@@ -621,7 +640,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
     if (target) loadProject(target);
     // Runs once; `projects` and `loadProject` are read at boot and not tracked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProjectId, isAuthor]);
+  }, [initialProjectId, initialViewCode, isAuthor]);
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
@@ -852,6 +871,22 @@ export default function App({ mode, initialProjectId }: AppProps) {
   }
 
   /** Share → image: the comparison on screen, with a footer (exportImage.ts). */
+  /**
+   * A link to exactly what's on screen (viewLink.ts). The open comparison's
+   * pins are kept, so the framing holds on other screen sizes; otherwise each
+   * map is centred.
+   */
+  async function makeViewLink(): Promise<string> {
+    const project = captureProject(
+      exportTitle(openProject?.title, leftCity.name, rightCity.name),
+      { left: openProject?.left.pin ?? CENTRE_PIN, right: openProject?.right.pin ?? CENTRE_PIN },
+      'shared',
+      0
+    );
+    if (!project) throw new Error('The maps are still loading.');
+    return viewLink(await encodeView(project));
+  }
+
   function renderShareImage() {
     const container = splitContainerRef.current;
     const left = leftMapRef.current;
@@ -1310,6 +1345,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
         opened={shareOpened}
         onClose={closeShare}
         render={renderShareImage}
+        makeViewLink={makeViewLink}
         link={
           openFromExplore
             ? { url: shareLink(openFromExplore.id), title: displayTitle(openFromExplore.title) }
