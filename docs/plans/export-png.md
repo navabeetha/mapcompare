@@ -97,5 +97,5 @@ transforms. It would also be a new dependency, for worse results.
 
 ## Not now
 
-Other formats (JPEG, SVG, PDF), a custom size, the sizes panel in the image,
-and embed.
+JPEG has shipped. The rest (SVG, PDF, a custom size, the sizes panel in the
+image) and embed are in [`../backlog.md`](../backlog.md).

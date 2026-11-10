@@ -18,10 +18,8 @@ end with a reorder and its revert). Next stage starts at "Next" below.
 
 ## Next
 
-1. **Export:** completes the cycle Featured → Explore → create → publish.
-   Not yet designed.
-2. **Embed:** only if it's cheap.
-3. Step 4 (notes), then step 5 (city limits), below.
+Remaining work (embed, author notes, city limits, public saving) moved to
+[`../backlog.md`](../backlog.md) on 2026-11-10. Export shipped as Share.
 
 ## Goal
 
@@ -77,30 +75,10 @@ comparisons.
 - This replaces "Export drafts to clipboard". Keep a plain "Copy JSON" as a
   backup way out.
 
-## Step 4: author notes on the map (with the Explore deep dive)
+## Steps 4 and 5, and later work
 
-- The author places short text notes on either map, for example "Old city
-  walls" or "Same size as Central Park". They're saved with the comparison and
-  shown to readers.
-- Probably a new shape kind, `note`: one point plus text. It reuses the shape
-  layer, the save format and the mirror-to-other-map behaviour.
-- Readers see the notes but can't edit them, unless public saving arrives.
-
-## Step 5: city limits (parked 2026-11-10)
-
-- A per-map "City limits" button lists the boundary relations Nominatim returns
-  for that place (`polygon_geojson=1`, keep `category == boundary`).
-- The author picks the right one. It's added as an outline shape with its
-  area, simplified and saved with the comparison.
-- Known data gaps: Mumbai returns only a point; Tokyo returns the whole
-  prefecture, islands included. The Borders layer's "Cities" group covers
-  some of this when zoomed in.
-
-## Later, not in this plan
-
-- Public saving with curation: visitors submit and the author approves. That
-  needs a real backend (Supabase, Firebase or similar), because a public page
-  can't safely hold a write token.
+Moved to [`../backlog.md`](../backlog.md): author notes (step 4), city limits
+(step 5, parked) and public saving with curation.
 
 ## Checks before shipping
 
