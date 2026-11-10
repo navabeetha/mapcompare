@@ -326,6 +326,20 @@ html, body, #root {
 .manage-row:hover {
   background: var(--mantine-color-default-hover);
 }
+/* Drag and drop in the Explore column: the lifted row fades, and a line
+   shows the gap it would drop into. Inset shadows, so rows don't shift. */
+.manage-row.dragging {
+  opacity: 0.4;
+}
+.manage-row.drop-above {
+  box-shadow: inset 0 2px 0 var(--mantine-color-blue-filled);
+}
+.manage-row.drop-below {
+  box-shadow: inset 0 -2px 0 var(--mantine-color-blue-filled);
+}
+.drag-grip {
+  cursor: grab;
+}
 .manage-pending {
   padding: 8px 10px;
   border-radius: var(--mantine-radius-sm);

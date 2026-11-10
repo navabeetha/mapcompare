@@ -45,6 +45,20 @@ export function moveItem(list: Project[], id: string, dir: -1 | 1): Project[] {
   return out;
 }
 
+/**
+ * Drag and drop: puts the item at position `to` in the resulting list
+ * (clamped to the ends). Returns the same list if nothing would change.
+ */
+export function moveTo(list: Project[], id: string, to: number): Project[] {
+  const i = list.findIndex((p) => p.id === id);
+  if (i === -1) return list;
+  const j = Math.max(0, Math.min(list.length - 1, to));
+  if (i === j) return list;
+  const out = list.filter((p) => p.id !== id);
+  out.splice(j, 0, list[i]);
+  return out;
+}
+
 // ---------------------------------------------------------------- the file
 
 /** Indented with a final newline, so the commit diff on GitHub is readable. */

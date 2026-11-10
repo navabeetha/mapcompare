@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Group,
+  Menu,
   Modal,
   SimpleGrid,
   Stack,
@@ -15,14 +16,14 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  LuArrowDown,
-  LuArrowLeft,
-  LuArrowRight,
-  LuArrowUp,
   LuCheck,
   LuCopy,
   LuEye,
+  LuGlobe,
+  LuGlobeLock,
+  LuGripVertical,
   LuPencil,
+  LuRefreshCw,
   LuTrash2,
   LuUpload,
   LuX,
@@ -33,6 +34,7 @@ import {
   fetchPublished,
   getToken,
   moveItem,
+  moveTo,
   publishItem,
   PublishError,
   removeItem,
@@ -54,8 +56,11 @@ import {
  * touch this browser. Changes can be lined up before connecting GitHub; only
  * "Publish changes" needs the token.
  *
- * Layout: drafts on the left, Explore on the right (arrows move between
- * them), and a fixed footer with the GitHub connection and Publish.
+ * Layout: drafts on the left, Explore on the right. A draft's globe icon adds
+ * it to Explore; an Explore row's globe-lock icon takes it back to drafts.
+ * Explore rows reorder by drag and drop (native HTML5, no library), or with
+ * the arrow keys on the grip. The fixed footer has the GitHub connection, a
+ * Copy-as-JSON menu, Discard and Publish.
  */
 interface Props {
   opened: boolean;
@@ -81,6 +86,10 @@ export function ManageExploreModal(p: Props) {
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; where: 'pub' | 'draft'; value: string } | null>(null);
   const [confirming, setConfirming] = useState<{ id: string; where: 'pub' | 'draft' } | null>(null);
+  // Drag and drop: the row being dragged, and the gap it would drop into
+  // (0 = above the first row, n = below the last).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropSlot, setDropSlot] = useState<number | null>(null);
 
   const base = remote?.list ?? p.published;
   const dirty = serializeComparisons(base) !== serializeComparisons(working);
@@ -164,10 +173,10 @@ export function ManageExploreModal(p: Props) {
     }
   }
 
-  function copyJson() {
+  function copyJson(list: Project[], what: string) {
     navigator.clipboard
-      .writeText(serializeComparisons(working))
-      .then(() => notifications.show({ title: 'Copied', message: 'The published list, as JSON.', color: 'blue' }))
+      .writeText(serializeComparisons(list))
+      .then(() => notifications.show({ title: 'Copied', message: `${what}, as JSON.`, color: 'blue' }))
       .catch(() => notifications.show({ title: 'Copy failed', message: 'The browser blocked the clipboard.', color: 'red' }));
   }
 
@@ -215,7 +224,7 @@ export function ManageExploreModal(p: Props) {
     return (
       <Group gap={4} wrap="nowrap">
         <Text size="xs" c="red">
-          {where === 'pub' ? 'Remove from Explore?' : 'Delete draft?'}
+          {where === 'pub' ? 'Are you sure? It won’t be kept as a draft.' : 'Are you sure? This can’t be undone.'}
         </Text>
         <Button
           size="compact-xs"
@@ -235,10 +244,10 @@ export function ManageExploreModal(p: Props) {
     );
   }
 
-  const icon = (label: string, Icon: typeof LuEye, onClick: () => void, disabled = false) => (
+  const icon = (label: string, Icon: typeof LuEye, onClick: () => void, disabled = false, color = 'gray') => (
     <Tooltip label={label} withArrow openDelay={300}>
-      <ActionIcon size="sm" variant="subtle" color="gray" onClick={onClick} disabled={disabled} aria-label={label}>
-        <Icon size={14} />
+      <ActionIcon size="sm" variant="subtle" color={color} onClick={onClick} disabled={disabled} aria-label={label}>
+        <Icon size={14} color={color === 'red' ? 'var(--mantine-color-red-6)' : undefined} />
       </ActionIcon>
     </Tooltip>
   );
@@ -293,13 +302,13 @@ export function ManageExploreModal(p: Props) {
                       <>
                         {icon('Open on the maps', LuEye, () => open(item))}
                         {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'draft', value: item.title }))}
-                        {icon('Delete draft', LuTrash2, () => setConfirming({ id: item.id, where: 'draft' }))}
                         {icon(
                           publishedIds.has(item.id) ? 'Update the copy in Explore' : 'Add to Explore',
-                          LuArrowRight,
+                          publishedIds.has(item.id) ? LuRefreshCw : LuGlobe,
                           () => setWorking((w) => publishItem(w, item)),
                           saving,
                         )}
+                        {icon('Delete draft', LuTrash2, () => setConfirming({ id: item.id, where: 'draft' }), false, 'red')}
                       </>
                     )}
                   </Group>
@@ -318,33 +327,84 @@ export function ManageExploreModal(p: Props) {
                     Nothing in Explore. The public page needs at least one comparison to open on.
                   </Text>
                 )}
-                {working.map((item, i) => (
-                  <Group key={item.id} gap={4} wrap="nowrap" className="manage-row">
-                    {confirming?.id === item.id && confirming.where === 'pub' ? null : (
-                      icon(
-                        'Move back to drafts (takes it out of Explore)',
-                        LuArrowLeft,
-                        () => {
-                          if (!p.drafts.some((d) => d.id === item.id)) p.onDraftsChange([item, ...p.drafts]);
-                          setWorking((w) => removeItem(w, item.id));
-                        },
-                        saving,
-                      )
-                    )}
-                    {titleCell(item, 'pub')}
-                    {confirming?.id === item.id && confirming.where === 'pub' ? (
-                      confirmDelete(item, 'pub')
-                    ) : (
-                      <>
-                        {icon('Open on the maps', LuEye, () => open(item))}
-                        {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'pub', value: item.title }), saving)}
-                        {icon('Move up', LuArrowUp, () => setWorking((w) => moveItem(w, item.id, -1)), saving || i === 0)}
-                        {icon('Move down', LuArrowDown, () => setWorking((w) => moveItem(w, item.id, 1)), saving || i === working.length - 1)}
-                        {icon('Remove from Explore', LuTrash2, () => setConfirming({ id: item.id, where: 'pub' }), saving)}
-                      </>
-                    )}
-                  </Group>
-                ))}
+                {working.map((item, i) => {
+                  const canDrag = !saving && !renaming;
+                  // Show the drop line only where the drop would move something.
+                  const from = dragId ? working.findIndex((x) => x.id === dragId) : -1;
+                  const lineAbove = dropSlot === i && from !== i && from !== i - 1;
+                  const lineBelow = dropSlot === working.length && i === working.length - 1 && from !== i;
+                  return (
+                    <Group
+                      key={item.id}
+                      gap={4}
+                      wrap="nowrap"
+                      className={`manage-row${dragId === item.id ? ' dragging' : ''}${lineAbove ? ' drop-above' : ''}${lineBelow ? ' drop-below' : ''}`}
+                      draggable={canDrag}
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', item.id);
+                        setDragId(item.id);
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragId) return;
+                        e.preventDefault();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setDropSlot(e.clientY < r.top + r.height / 2 ? i : i + 1);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragId && dropSlot !== null && from !== -1) {
+                          // A slot below the dragged row shifts up by one once it's lifted out.
+                          setWorking((w) => moveTo(w, dragId, dropSlot > from ? dropSlot - 1 : dropSlot));
+                        }
+                        setDragId(null);
+                        setDropSlot(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setDropSlot(null);
+                      }}
+                    >
+                      <Tooltip label="Drag to reorder (or focus and use ↑ ↓)" withArrow openDelay={500}>
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="gray"
+                          className="drag-grip"
+                          aria-label={`Reorder ${displayTitle(item.title)}: use the up and down arrow keys`}
+                          disabled={!canDrag}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setWorking((w) => moveItem(w, item.id, e.key === 'ArrowUp' ? -1 : 1));
+                            }
+                          }}
+                        >
+                          <LuGripVertical size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      {titleCell(item, 'pub')}
+                      {confirming?.id === item.id && confirming.where === 'pub' ? (
+                        confirmDelete(item, 'pub')
+                      ) : (
+                        <>
+                          {icon('Open on the maps', LuEye, () => open(item))}
+                          {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'pub', value: item.title }), saving)}
+                          {icon(
+                            'Take out of Explore and back to drafts',
+                            LuGlobeLock,
+                            () => {
+                              if (!p.drafts.some((d) => d.id === item.id)) p.onDraftsChange([item, ...p.drafts]);
+                              setWorking((w) => removeItem(w, item.id));
+                            },
+                            saving,
+                          )}
+                          {icon('Remove from Explore', LuTrash2, () => setConfirming({ id: item.id, where: 'pub' }), saving, 'red')}
+                        </>
+                      )}
+                    </Group>
+                  );
+                })}
               </Stack>
             </div>
           </SimpleGrid>
@@ -364,11 +424,6 @@ export function ManageExploreModal(p: Props) {
                 <Button size="compact-xs" variant="subtle" color="red" onClick={forget}>
                   Forget token
                 </Button>
-              </Tooltip>
-              <Tooltip label="Copy the Explore list as JSON (backup)" withArrow>
-                <ActionIcon size="sm" variant="subtle" color="gray" onClick={copyJson} aria-label="Copy list as JSON">
-                  <LuCopy size={14} />
-                </ActionIcon>
               </Tooltip>
             </Group>
           ) : (
@@ -407,6 +462,24 @@ export function ManageExploreModal(p: Props) {
                 {changeCount} change{changeCount === 1 ? '' : 's'} not live yet
               </Text>
             )}
+            <Menu position="top-end" withArrow shadow="md">
+              <Menu.Target>
+                <Tooltip label="Copy as JSON (backup)" withArrow>
+                  <ActionIcon size="md" variant="subtle" color="gray" aria-label="Copy as JSON">
+                    <LuCopy size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Copy as JSON</Menu.Label>
+                <Menu.Item onClick={() => copyJson(p.drafts, 'Your drafts')} disabled={p.drafts.length === 0}>
+                  Drafts ({p.drafts.length})
+                </Menu.Item>
+                <Menu.Item onClick={() => copyJson(working, dirty ? 'The Explore list, with your unpublished changes' : 'The Explore list')}>
+                  Explore list ({working.length}){dirty ? ', with unpublished changes' : ''}
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
             <Button size="xs" variant="default" onClick={() => setWorking(base)} disabled={!dirty || saving}>
               Discard
             </Button>

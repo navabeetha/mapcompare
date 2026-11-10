@@ -5,6 +5,7 @@ import {
   describeChanges,
   encodeContent,
   moveItem,
+  moveTo,
   parseComparisons,
   publishItem,
   removeItem,
@@ -53,6 +54,19 @@ describe('list edits never change the list they are given', () => {
     expect(ids(moveItem(list, 'b', 1))).toEqual(['a', 'c', 'b']);
     expect(ids(moveItem(list, 'a', -1))).toEqual(['a', 'b', 'c']);
     expect(ids(moveItem(list, 'c', 1))).toEqual(['a', 'b', 'c']);
+  });
+  it('moveTo (drag and drop) puts the item at that position in the result', () => {
+    const four = [p('a'), p('b'), p('c'), p('d')];
+    expect(ids(moveTo(four, 'a', 2))).toEqual(['b', 'c', 'a', 'd']);
+    expect(ids(moveTo(four, 'd', 0))).toEqual(['d', 'a', 'b', 'c']);
+    expect(ids(moveTo(four, 'b', 3))).toEqual(['a', 'c', 'd', 'b']);
+    expect(ids(four)).toEqual(['a', 'b', 'c', 'd']);
+  });
+  it('moveTo clamps out-of-range positions and ignores unknown ids', () => {
+    expect(ids(moveTo(list, 'a', 99))).toEqual(['b', 'c', 'a']);
+    expect(ids(moveTo(list, 'c', -5))).toEqual(['c', 'a', 'b']);
+    expect(moveTo(list, 'zz', 0)).toBe(list);
+    expect(moveTo(list, 'b', 1)).toBe(list);
   });
 });
 
