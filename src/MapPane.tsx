@@ -58,7 +58,33 @@ interface MapPaneProps {
   onSearchCity: (side: Side, city: CityPreset) => void;
   onShapesChange: (side: Side, shapes: MeasureShape[]) => void;
   onSelectShape: (side: Side, id: string | null) => void;
+  /**
+   * The screen point the +/- buttons zoom around: the middle of this map's
+   * visible part (pin.ts `frameCentre`), not the map's own centre, which is
+   * the split bar.
+   */
+  zoomAnchor: (side: Side) => { x: number; y: number };
 }
+
+/**
+ * Leaflet's zoom buttons, zooming around a chosen point instead of the map's
+ * centre. Same buttons, classes and steps (zoomDelta, ×3 with Shift).
+ */
+const AnchoredZoom = L.Control.Zoom.extend({
+  _step(this: { _map: L.Map; _disabled?: boolean; options: { anchor: () => L.Point } }, dir: 1 | -1, e: MouseEvent) {
+    const map = this._map;
+    if (this._disabled) return;
+    const next = map.getZoom() + dir * (map.options.zoomDelta ?? 1) * (e.shiftKey ? 3 : 1);
+    if (next > map.getMaxZoom() || next < map.getMinZoom()) return;
+    map.setZoomAround(this.options.anchor(), next);
+  },
+  _zoomIn(this: { _step: (d: 1, e: MouseEvent) => void }, e: MouseEvent) {
+    this._step(1, e);
+  },
+  _zoomOut(this: { _step: (d: -1, e: MouseEvent) => void }, e: MouseEvent) {
+    this._step(-1, e);
+  },
+}) as unknown as new (options: L.Control.ZoomOptions & { anchor: () => L.Point }) => L.Control.Zoom;
 
 interface SearchResult {
   lat: string;
@@ -146,7 +172,10 @@ export function MapPane({
   onSearchCity,
   onShapesChange,
   onSelectShape,
+  zoomAnchor,
 }: MapPaneProps) {
+  const zoomAnchorRef = useRef(zoomAnchor);
+  zoomAnchorRef.current = zoomAnchor;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   /** The base view and, over satellite, the labels and borders. Swapped together. */
@@ -181,7 +210,8 @@ export function MapPane({
     const map = L.map(containerRef.current, {
       center: [initialCity.lat, initialCity.lng],
       zoom: initialCity.zoom,
-      zoomControl: side === 'left',
+      // Our own zoom buttons go on below (AnchoredZoom); left map only.
+      zoomControl: false,
       // No zoom snapping. The whole premise is that one pixel covers the same
       // ground distance on both panes, and the compensated zoom that achieves
       // that is an arbitrary real number (sourceZoom + log2(cos ratio)). Snapping
@@ -208,6 +238,16 @@ export function MapPane({
     // corner instead. The attribution control is built here rather than via the
     // attributionControl option for the same reason — it must be added before
     // the tile layer, which registers its attribution with it.
+    if (side === 'left') {
+      map.addControl(
+        new AnchoredZoom({
+          anchor: () => {
+            const p = zoomAnchorRef.current(side);
+            return L.point(p.x, p.y);
+          },
+        })
+      );
+    }
     const corner = side === 'left' ? 'bottomleft' : 'bottomright';
     L.control.attribution({ position: corner }).addTo(map);
     // Not Leaflet's own scale: ours shows the same distances on both maps.

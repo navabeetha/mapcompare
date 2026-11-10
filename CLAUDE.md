@@ -46,6 +46,12 @@ Run before every push. `npm run check` covers the automated part.
 
 ## Invariants worth not breaking
 
+- **"Centre" means the middle of a map's visible part** (`frameCentre` in
+  `pin.ts`), not the map's own centre, which is the split bar. Searches land
+  there, the +/- buttons zoom around it (`AnchoredZoom` in `MapPane.tsx`),
+  and the following map zooms around its own (the debounce in
+  `handleUserZoom`). It's level with the map centre, so latitude and the
+  scale match don't change. Wheel and pinch zoom around the pointer.
 - **Zoom is synced; panning is deliberately independent.** Hand-aligning
   landmarks between the two maps is the point. Don't "fix" independent panning.
 - **`App` is the single writer of map view state.** Everything programmatic goes

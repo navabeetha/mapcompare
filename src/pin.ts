@@ -71,11 +71,12 @@ export function centreForPin(
 }
 
 /**
- * Where a searched place lands: the middle of that map's visible part. The
- * maps are full-screen behind a curtain, so the map's own centre is the split
- * bar, right at the edge of what you can see.
+ * The middle of one map's visible part, in screen pixels. Searches land here
+ * and the zoom buttons zoom around it. The maps are full-screen behind a
+ * curtain, so a map's own centre is the split bar, right at the edge of what
+ * you can see; this is the centre of what you actually see.
  */
-export function searchTarget(
+export function frameCentre(
   side: 'left' | 'right',
   splitPct: number,
   width: number,

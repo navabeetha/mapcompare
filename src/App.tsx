@@ -66,7 +66,7 @@ import {
 import comparisonsJson from './data/comparisons.json';
 import logoUrl from './assets/mapcompare-logo.svg';
 import type { AppMode } from './mode';
-import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, searchTarget, visibleFrame, type Pin } from './pin';
+import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, frameCentre, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
 import { renderComparison } from './exportImage';
 import { ShareModal } from './ShareModal';
@@ -514,7 +514,7 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
       // map's own centre (which is the split bar).
       if (self) {
         const size = self.getSize();
-        const target = searchTarget(side, splitPctRef.current, size.x, size.y);
+        const target = frameCentre(side, splitPctRef.current, size.x, size.y);
         const c = centreForPin(self.project([city.lat, city.lng], zoom), target, size);
         applyView(side, self.unproject(L.point(c.x, c.y), zoom), zoom);
       } else {
@@ -523,6 +523,13 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
     },
     [applyView]
   );
+
+  /** The +/- buttons zoom around the middle of the map's visible part. */
+  const zoomAnchor = useCallback((side: Side) => {
+    const map = mapFor(side);
+    const size = map ? map.getSize() : { x: window.innerWidth, y: window.innerHeight };
+    return frameCentre(side, splitPctRef.current, size.x, size.y);
+  }, []);
 
   const handleUserZoom = useCallback(
     (side: Side, zoom: number, sourceLat: number) => {
@@ -543,12 +550,21 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
       debounceRef.current = window.setTimeout(() => {
         const targetCenter = target.getCenter();
         const compensated = compensatedZoom(zoom, sourceLat, targetCenter.lat);
+        // Follow around the middle of the target map's visible part, not its
+        // own centre (the split bar), so what you're looking at stays put.
+        // That point is level with the centre, so the latitude, and with it
+        // the scale match, is unchanged.
+        const size = target.getSize();
+        const anchor = frameCentre(targetSide, splitPctRef.current, size.x, size.y);
+        const anchorPt = L.point(anchor.x, anchor.y);
+        const held = target.containerPointToLatLng(anchorPt);
+        const c = centreForPin(target.project(held, compensated), anchor, size);
         // Go through applyView so the suppression flag is what stops the
         // target's own zoomend from syncing straight back. This used to be a
         // 50 ms timing window, which was already fragile and becomes untenable
         // with zoomSnap off: zoom is now continuous, so these events fire on
         // every frame of a wheel gesture rather than once per quarter step.
-        applyView(targetSide, targetCenter, compensated);
+        applyView(targetSide, target.unproject(L.point(c.x, c.y), compensated), compensated);
       }, 150);
     },
     [recomputeGrid, applyView]
@@ -1240,6 +1256,7 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
               onSearchCity={handleSearchCity}
               onShapesChange={handleShapesChange}
               onSelectShape={handleSelectShape}
+              zoomAnchor={zoomAnchor}
             />
           </div>
           <div
@@ -1269,6 +1286,7 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
               onSearchCity={handleSearchCity}
               onShapesChange={handleShapesChange}
               onSelectShape={handleSelectShape}
+              zoomAnchor={zoomAnchor}
             />
           </div>
           <div
