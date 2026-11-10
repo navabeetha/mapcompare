@@ -57,8 +57,8 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
             </List.Item>
             <List.Item>
               Open <strong>Layers</strong> to switch both maps between
-              Satellite and Map, turn place-name labels or the scale grid on
-              and off, and fix the grid cell length.
+              Satellite and Map, turn place-name labels, borders or the scale
+              grid on and off, and fix the grid cell length.
             </List.Item>
             <List.Item>
               <strong>Draw</strong> a path, circle or polygon to measure ground
@@ -147,7 +147,8 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
           via <Anchor href="https://openfreemap.org">OpenFreeMap</Anchor>, and{' '}
           <Anchor href="https://nominatim.org">Nominatim</Anchor>, all open
           source. Satellite imagery is from Esri: free to use, but not open
-          data.
+          data. MapCompare doesn't draw country borders. Many are disputed, and
+          it compares places rather than drawing lines between them.
         </Text>
 
         <Divider />

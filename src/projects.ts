@@ -3,6 +3,7 @@ import type { MapStyle } from './tileLayers';
 import type { MeasureShape } from './shapes';
 import type { SavedView } from './savedViews';
 import type { Pin } from './pin';
+import type { BorderLevel } from './vectorStyle';
 
 /**
  * Historical key. Kept from the v1 "saved views" era so existing drafts survive
@@ -44,6 +45,8 @@ export interface Project {
   grid: { visible: boolean; overrideMeters: number | null };
   /** Place-name labels on both maps. Missing (older saves) means off. */
   labels?: boolean;
+  /** Border groups shown on both maps. Missing or empty (older saves) means off. */
+  borders?: BorderLevel[];
   left: PaneState;
   right: PaneState;
   createdAt: number;

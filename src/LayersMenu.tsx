@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActionIcon,
   Button,
+  Checkbox,
   Divider,
   Group,
   NumberInput,
@@ -15,6 +16,7 @@ import {
 import { MdLayers } from 'react-icons/md';
 import { formatDistance } from './altitude';
 import { STYLE_LABELS, type MapStyle } from './tileLayers';
+import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
 interface Props {
   gridVisible: boolean;
@@ -29,7 +31,16 @@ interface Props {
   /** Base view, shared by both maps. */
   mapStyle: MapStyle;
   onMapStyleChange: (style: MapStyle) => void;
+  /** Border groups on. Empty means the Borders switch is off. */
+  borders: BorderLevel[];
+  onBordersChange: (levels: BorderLevel[]) => void;
 }
+
+const BORDER_NAMES: Record<BorderLevel, string> = {
+  states: 'States & regions',
+  districts: 'Districts',
+  cities: 'Cities (zoomed in)',
+};
 
 /**
  * The Layers dropdown: things drawn over both maps. Each layer is one row, a
@@ -92,6 +103,29 @@ export function LayersMenu(p: Props) {
             label="Labels"
             description="Countries, regions, cities, districts, seas."
           />
+          <Divider />
+          <Switch
+            size="sm"
+            labelPosition="left"
+            styles={ROW}
+            checked={p.borders.length > 0}
+            onChange={(e) => p.onBordersChange(e.currentTarget.checked ? ALL_BORDER_LEVELS : [])}
+            label="Borders"
+            description="States, districts, cities. No country borders."
+          />
+          {p.borders.length > 0 && (
+            <Checkbox.Group
+              value={p.borders}
+              // Keep the menu's order whatever order they're ticked in.
+              onChange={(v) => p.onBordersChange(ALL_BORDER_LEVELS.filter((l) => v.includes(l)))}
+            >
+              <Stack gap={6} pl={2}>
+                {ALL_BORDER_LEVELS.map((l) => (
+                  <Checkbox key={l} size="xs" value={l} label={BORDER_NAMES[l]} />
+                ))}
+              </Stack>
+            </Checkbox.Group>
+          )}
           <Divider />
           <Switch
             size="sm"

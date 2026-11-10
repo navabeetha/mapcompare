@@ -58,6 +58,7 @@ import { CURATED_VIEWS } from './curatedViews';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
+import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
 /**
  * The comparisons that ship with the build. They are still authored in the v1
@@ -139,6 +140,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const [gridVisible, setGridVisible] = useState(false);
   /** Place-name labels on both maps (Layers menu). Saved with a project. */
   const [labelsVisible, setLabelsVisible] = useState(true);
+  /** Border groups on both maps (Layers menu). Off by default. Never country borders. */
+  const [borders, setBorders] = useState<BorderLevel[]>([]);
   const [gridStepPx, setGridStepPx] = useState(100);
   const [gridStepMeters, setGridStepMeters] = useState(100);
   const [gridOverrideMeters, setGridOverrideMeters] = useState<number | null>(null);
@@ -649,6 +652,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
         splitPct,
         grid: { visible: gridVisible, overrideMeters: gridOverrideMeters },
         labels: labelsVisible,
+        borders,
         left: {
           city: leftCity,
           lat: leftMap.getCenter().lat,
@@ -706,6 +710,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
     // Labels are on by default, including for comparisons saved before the
     // switch existed.
     setLabelsVisible(project.labels ?? true);
+    setBorders((project.borders ?? []).filter((b) => ALL_BORDER_LEVELS.includes(b)));
     applyGridOverride(project.grid.overrideMeters);
 
     // Recompute the right pane's zoom from the left rather than trusting what
@@ -827,6 +832,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 onLabelsVisibleChange={setLabelsVisible}
                 mapStyle={mapStyle}
                 onMapStyleChange={setMapStyle}
+                borders={borders}
+                onBordersChange={setBorders}
               />
               <Divider
                 orientation="vertical"
@@ -936,6 +943,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               gridStepPx={gridStepPx}
               style={mapStyle}
               labels={labelsVisible}
+              borders={borders}
               showControls
               shapeMode={shapeMode}
               shapes={leftShapes}
@@ -962,6 +970,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               gridStepPx={gridStepPx}
               style={mapStyle}
               labels={labelsVisible}
+              borders={borders}
               showControls
               shapeMode={shapeMode}
               shapes={rightShapes}

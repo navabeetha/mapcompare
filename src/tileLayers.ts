@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { labelsOnlyStyle, loadLibertyStyle, OPENFREEMAP_ATTRIBUTION, withoutLabels } from './labels';
+import { loadLibertyStyle, mapViewStyle, OPENFREEMAP_ATTRIBUTION, overlayStyle, type VectorOptions } from './vectorStyle';
 
 /**
  * The base view, shared by both maps. 'roadmap' is the Map view; the key is
@@ -18,7 +18,7 @@ export function toMapStyle(v: unknown): MapStyle {
   return v === 'roadmap' ? 'roadmap' : 'satellite';
 }
 
-/** Leaflet pane for the labels over satellite: above the imagery, below the
+/** Leaflet pane for the labels and borders over satellite: above the imagery, below the
  *  measurement shapes (overlayPane is 400). MapPane creates it. */
 export const LABELS_PANE = 'labelsPane';
 
@@ -40,13 +40,13 @@ export function createSatelliteLayer(): L.TileLayer {
 
 /**
  * A layer drawn by MapLibre from OpenFreeMap's vector tiles:
- *   - 'map': the full Map view, with or without its labels;
- *   - 'labels': place and water names only, to lay over satellite.
+ *   - 'map': the full Map view, with our borders and with or without labels;
+ *   - 'overlay': borders and place names only, to lay over satellite.
  *
  * MapLibre (~250 KB) is imported here on first use, so the default satellite
  * view never downloads it.
  */
-export async function createVectorLayer(kind: 'map' | 'labels', labels: boolean): Promise<L.Layer> {
+export async function createVectorLayer(kind: 'map' | 'overlay', opts: VectorOptions): Promise<L.Layer> {
   const [{ maplibreGL }, { setWorkerUrl }, { default: workerUrl }, style] = await Promise.all([
     import('@maplibre/maplibre-gl-leaflet'),
     import('maplibre-gl'),
@@ -59,10 +59,10 @@ export async function createVectorLayer(kind: 'map' | 'labels', labels: boolean)
   ]);
   setWorkerUrl(workerUrl);
   const layer = maplibreGL({
-    style: kind === 'labels' ? labelsOnlyStyle(style) : labels ? style : withoutLabels(style),
+    style: kind === 'overlay' ? overlayStyle(style, opts) : mapViewStyle(style, opts),
     // Leaflet shows the credit; MapLibre's own control would be a second copy.
     attributionControl: false,
-    ...(kind === 'labels' ? { pane: LABELS_PANE } : {}),
+    ...(kind === 'overlay' ? { pane: LABELS_PANE } : {}),
   } as L.LeafletMaplibreGLOptions);
   // The plugin doesn't report a credit to Leaflet, and the OpenStreetMap licence
   // requires one. Leaflet adds and removes it with the layer.

@@ -97,5 +97,9 @@ before `zoomSnap: 0` land exactly scale-matched.
   in the Layers menu. The default is satellite with labels on. A Topo view
   (OpenTopoMap) was tried and dropped as hard to read. CARTO, the old Map
   view, now needs an API key and is gone.
+- **No country borders, in any view.** This is a deliberate stand. The Borders
+  layer (`vectorStyle.ts`) draws admin levels 3–8 only, and never admin_level 2,
+  disputed, `claimed_by` or maritime lines. The Map view also strips all of
+  Liberty's own boundary layers. Tests pin this; don't relax it.
 - **First load is not scale-matched** in tool mode — both cities open at their
   preset zoom until you interact. A sync in `handleReady` would close it.

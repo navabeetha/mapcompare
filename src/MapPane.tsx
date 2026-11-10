@@ -12,6 +12,7 @@ import {
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import type { CityPreset } from './presets';
+import type { BorderLevel } from './vectorStyle';
 import { createSatelliteLayer, createVectorLayer, LABELS_PANE, type MapStyle } from './tileLayers';
 import { drawScaleGrid } from './GridLayer';
 import { ShapeLayer } from './ShapeLayer';
@@ -34,6 +35,8 @@ interface MapPaneProps {
   style: MapStyle;
   /** Place names on. Both maps share this, and the base view. */
   labels: boolean;
+  /** Border groups to draw. Never country borders; see vectorStyle.ts. */
+  borders: BorderLevel[];
   /** Active shape tool for this pane. 'off' makes existing shapes read-only. */
   shapeMode: ShapeMode;
   /** Shows the per-pane search and tile-style picker. */
@@ -121,6 +124,7 @@ export function MapPane({
   gridStepPx,
   style,
   labels,
+  borders,
   shapeMode,
   showControls,
   shapes,
@@ -136,7 +140,7 @@ export function MapPane({
 }: MapPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  /** The base view and, over satellite, the labels. Swapped together. */
+  /** The base view and, over satellite, the labels and borders. Swapped together. */
   const baseLayersRef = useRef<L.Layer[]>([]);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const firstLoadDoneRef = useRef(false);
@@ -226,6 +230,7 @@ export function MapPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const bordersKey = borders.join(',');
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -243,8 +248,8 @@ export function MapPane({
     // The vector layers load asynchronously. If the view or the labels switch
     // changes meanwhile, or the pane goes away, the late layer is dropped.
     let stale = false;
-    const addVector = (kind: 'map' | 'labels') => {
-      createVectorLayer(kind, labels)
+    const addVector = (kind: 'map' | 'overlay') => {
+      createVectorLayer(kind, { labels, borders })
         .then((layer) => {
           if (stale || mapRef.current !== map) return;
           layer.addTo(map);
@@ -267,12 +272,15 @@ export function MapPane({
       tile.on('load', firstPaintDone);
       tile.addTo(map);
       baseLayersRef.current.push(tile);
-      if (labels) addVector('labels');
+      if (labels || borders.length > 0) addVector('overlay');
     }
     return () => {
       stale = true;
     };
-  }, [style, labels]);
+    // bordersKey stands in for `borders`: a new array with the same groups
+    // must not rebuild the layers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [style, labels, bordersKey]);
 
   useEffect(() => {
     const canvas = gridCanvasRef.current;

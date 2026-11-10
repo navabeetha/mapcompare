@@ -65,6 +65,16 @@ comparisons.
   layer, the save format and the mirror-to-other-map behaviour.
 - Readers see the notes but can't edit them, unless public saving arrives.
 
+## Step 5: city limits (parked 2026-11-10)
+
+- A per-map "City limits" button lists the boundary relations Nominatim returns
+  for that place (`polygon_geojson=1`, keep `category == boundary`).
+- The author picks the right one. It's added as an outline shape with its
+  area, simplified and saved with the comparison.
+- Known data gaps: Mumbai returns only a point; Tokyo returns the whole
+  prefecture, islands included. The Borders layer's "Cities" group covers
+  some of this when zoomed in.
+
 ## Later, not in this plan
 
 - Public saving with curation: visitors submit and the author approves. That
