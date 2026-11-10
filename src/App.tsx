@@ -22,7 +22,7 @@ import {
   MdCompareArrows,
   MdDeleteOutline,
   MdOpenWith,
-  MdPentagon,
+  MdOutlinePentagon,
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
@@ -54,10 +54,12 @@ import {
   migrateProjects,
   persistProjects,
   SCHEMA_VERSION,
+  type PaneState,
   type Project,
 } from './projects';
 import { CURATED_VIEWS } from './curatedViews';
 import type { AppMode } from './mode';
+import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import type { MapStyle } from './tileLayers';
 
 /**
@@ -71,6 +73,12 @@ const paneHeightPx = () => window.innerHeight - HEADER_HEIGHT;
 
 type Side = 'left' | 'right';
 
+interface Anchor {
+  center: L.LatLng;
+  zoom: number | null;
+  pin?: { spot: Pin; place: L.LatLng; splitPct: number };
+}
+
 /**
  * The shape toolbar. 'edit' selects and reshapes what's already drawn; the rest
  * arm a drawing gesture. Clicking the active tool again returns to 'off'.
@@ -79,7 +87,7 @@ const SHAPE_TOOLS = [
   { mode: 'edit', label: 'Select and reshape', Icon: MdOpenWith },
   { mode: 'line', label: 'Measure a path', Icon: MdPolyline },
   { mode: 'circle', label: 'Draw a circle', Icon: MdRadioButtonUnchecked },
-  { mode: 'polygon', label: 'Draw a polygon', Icon: MdPentagon },
+  { mode: 'polygon', label: 'Draw a polygon', Icon: MdOutlinePentagon },
 ] as const satisfies readonly { mode: ShapeMode; label: string; Icon: unknown }[];
 
 interface ShapeTotals {
@@ -112,6 +120,10 @@ interface AppProps {
 }
 
 export default function App({ mode, initialProjectId }: AppProps) {
+  // The two modes have the same tools: grid, shapes, per-map search and tile
+  // style. The only difference is that the tool can save. Save and the local
+  // Drafts list are reserved for the author for now. Letting the public save,
+  // probably with curation, is a later decision.
   const isAuthor = mode === 'tool';
 
   const [leftCity, setLeftCity] = useState<CityPreset>(CITIES.tokyo);
@@ -167,10 +179,11 @@ export default function App({ mode, initialProjectId }: AppProps) {
   // at the start of a resize (or set explicitly when loading a view) and then
   // restored verbatim on every subsequent frame, which is what keeps the
   // framing stable — see pinView below. `zoom: null` means "keep whatever zoom
-  // the pane currently has".
+  // the pane currently has". A `pin` (only set when loading a pinned project)
+  // puts that place on its pin spot instead of putting `center` in the middle.
   const anchorRef = useRef<{
-    left: { center: L.LatLng; zoom: number | null };
-    right: { center: L.LatLng; zoom: number | null };
+    left: Anchor;
+    right: Anchor;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -226,11 +239,24 @@ export default function App({ mode, initialProjectId }: AppProps) {
    * (already nudged) position.
    */
   const pinView = useCallback(
-    (side: Side, center: L.LatLng, zoom: number | null) => {
+    (side: Side, anchor: Anchor) => {
       const map = mapFor(side);
       if (!map) return;
       map.invalidateSize({ pan: false });
-      applyView(side, center, zoom ?? map.getZoom());
+      const zoom = anchor.zoom ?? map.getZoom();
+      let center = anchor.center;
+      // A pinned project: work out the centre that puts the pinned place on its
+      // spot, now that the container has its real size.
+      if (anchor.pin) {
+        const size = map.getSize();
+        const target = pinPoint(
+          anchor.pin.spot,
+          visibleFrame(side, anchor.pin.splitPct, size.x, size.y)
+        );
+        const c = centreForPin(map.project(anchor.pin.place, zoom), target, size);
+        center = map.unproject(L.point(c.x, c.y), zoom);
+      }
+      applyView(side, center, zoom);
     },
     [applyView]
   );
@@ -249,8 +275,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const repinAnchors = useCallback(() => {
     const anchors = anchorRef.current;
     if (!anchors) return;
-    pinView('left', anchors.left.center, anchors.left.zoom);
-    pinView('right', anchors.right.center, anchors.right.zoom);
+    pinView('left', anchors.left);
+    pinView('right', anchors.right);
   }, [pinView]);
 
   const recomputeGrid = useCallback((zoom: number, lat: number) => {
@@ -438,7 +464,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
    * than listing every shortcut at once.
    */
   const shapeHint = useMemo(() => {
-    if (!isAuthor || shapeMode === 'off') return null;
+    if (shapeMode === 'off') return null;
 
     if (shapeMode === 'edit') {
       return selected
@@ -458,7 +484,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
     return selected
       ? `${drawing} · Esc to cancel · Delete removes the selected shape`
       : `${drawing} · Esc to cancel`;
-  }, [isAuthor, shapeMode, selected]);
+  }, [shapeMode, selected]);
 
   const areaRatio = ratioOf(leftTotals.areaM2, rightTotals.areaM2);
   const lengthRatio = ratioOf(leftTotals.lengthM, rightTotals.lengthM);
@@ -604,12 +630,22 @@ export default function App({ mode, initialProjectId }: AppProps) {
     openSave();
   }
 
-  function handleConfirmSave(title: string) {
+  function handleConfirmSave(title: string, pins: { left: Pin; right: Pin }) {
     const leftMap = leftMapRef.current;
     const rightMap = rightMapRef.current;
     if (!leftMap || !rightMap) return;
 
     closeSave();
+
+    // The place under each map's pin spot on this screen, saved with the pin.
+    const pinFor = (side: Side, map: L.Map): PaneState['pin'] => {
+      const spot = pins[side];
+      if (isCentrePin(spot)) return undefined;
+      const size = map.getSize();
+      const pt = pinPoint(spot, visibleFrame(side, splitPct, size.x, size.y));
+      const place = map.containerPointToLatLng(L.point(pt.x, pt.y));
+      return { ...spot, lat: place.lat, lng: place.lng };
+    };
 
     try {
       // Capture the live state of everything a reader needs to see the same
@@ -628,6 +664,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
           zoom: leftMap.getZoom(),
           style: leftStyle,
           shapes: leftShapes,
+          pin: pinFor('left', leftMap),
         },
         right: {
           city: rightCity,
@@ -636,6 +673,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
           zoom: rightMap.getZoom(),
           style: rightStyle,
           shapes: rightShapes,
+          pin: pinFor('right', rightMap),
         },
         createdAt: Date.now(),
       };
@@ -690,14 +728,26 @@ export default function App({ mode, initialProjectId }: AppProps) {
     // it next frame. Setting the view directly here would reframe the moment the
     // panes take their new widths — the restore has to land *after* the layout,
     // not before it.
+    // Pins are applied once here, on load. A later window resize keeps
+    // whatever is in the middle of each map, as before.
+    const pinOf = (pane: Project['left']): Anchor['pin'] =>
+      pane.pin && !isCentrePin(pane.pin)
+        ? {
+            spot: { x: pane.pin.x, y: pane.pin.y },
+            place: L.latLng(pane.pin.lat, pane.pin.lng),
+            splitPct: project.splitPct,
+          }
+        : undefined;
     anchorRef.current = {
       left: {
         center: L.latLng(project.left.lat, project.left.lng),
         zoom: project.left.zoom,
+        pin: pinOf(project.left),
       },
       right: {
         center: L.latLng(project.right.lat, project.right.lng),
         zoom: rightZoom,
+        pin: pinOf(project.right),
       },
     };
     setSplitPct(project.splitPct);
@@ -757,8 +807,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap={0} wrap="nowrap" align="center">
             <Title order={4}>MapCompare</Title>
-            {/* View mode leads with what the comparison *is*; the authoring
-                controls it was built with are not part of the content. */}
+            {/* View mode leads with the title of the comparison that's open. */}
             {!isAuthor && openProject && (
               <Group gap={8} wrap="nowrap" align="baseline" ml={32}>
                 <Text fw={600} size="sm" tt="capitalize">
@@ -772,7 +821,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
               </Group>
             )}
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
-              {isAuthor && (
               <Group gap={6} wrap="nowrap" align="center">
                 <Switch
                   size="sm"
@@ -862,15 +910,14 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 </Popover>
                 )}
               </Group>
-              )}
-              {isAuthor && (
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
               />
-              )}
-              {isAuthor && (
               <Group gap={4} wrap="nowrap" align="center">
+                <Text fz={12} c="dimmed" mr={4}>
+                  Draw
+                </Text>
                 {SHAPE_TOOLS.map(({ mode, label, Icon }) => (
                   <Tooltip key={mode} label={label} withArrow>
                     <ActionIcon
@@ -928,15 +975,10 @@ export default function App({ mode, initialProjectId }: AppProps) {
                   </Tooltip>
                 )}
               </Group>
-              )}
-              {isAuthor && (
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
               />
-              )}
-              {/* The altitude read-out stays in view mode: it is a measurement,
-                  which is content, not an authoring control. */}
               <Badge variant="light" color="gray" size="sm" radius="sm">
                 Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
               </Badge>
@@ -976,8 +1018,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
               gridStepPx={gridStepPx}
               style={leftStyle}
               onStyleChange={handleStyleChange}
-              showControls={isAuthor}
-              shapeMode={isAuthor ? shapeMode : 'off'}
+              showControls
+              shapeMode={shapeMode}
               shapes={leftShapes}
               selectedShapeId={selected?.side === 'left' ? selected.id : null}
               query={leftQuery}
@@ -1002,8 +1044,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
               gridStepPx={gridStepPx}
               style={rightStyle}
               onStyleChange={handleStyleChange}
-              showControls={isAuthor}
-              shapeMode={isAuthor ? shapeMode : 'off'}
+              showControls
+              shapeMode={shapeMode}
               shapes={rightShapes}
               selectedShapeId={selected?.side === 'right' ? selected.id : null}
               query={rightQuery}
@@ -1120,6 +1162,10 @@ export default function App({ mode, initialProjectId }: AppProps) {
       <SaveViewModal
         opened={saveOpened}
         defaultTitle={pendingTitle}
+        defaultPins={{
+          left: openProject?.left.pin ?? CENTRE_PIN,
+          right: openProject?.right.pin ?? CENTRE_PIN,
+        }}
         onSave={handleConfirmSave}
         onClose={closeSave}
       />

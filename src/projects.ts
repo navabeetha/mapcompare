@@ -2,6 +2,7 @@ import type { CityPreset } from './presets';
 import type { MapStyle } from './tileLayers';
 import type { MeasureShape } from './shapes';
 import type { SavedView } from './savedViews';
+import type { Pin } from './pin';
 
 /**
  * Historical key. Kept from the v1 "saved views" era so existing drafts survive
@@ -20,6 +21,12 @@ export interface PaneState {
   zoom: number;
   style: MapStyle;
   shapes: MeasureShape[];
+  /**
+   * Where this map is pinned in its visible part of the screen, and the place
+   * that sat on that spot when the author saved. Missing means centred, using
+   * lat/lng above. lat/lng is still the centre on the author's screen.
+   */
+  pin?: Pin & { lat: number; lng: number };
 }
 
 /**

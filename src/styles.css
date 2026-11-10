@@ -12,6 +12,11 @@ html, body, #root {
 
 .split-container {
   position: relative;
+  /* A stacking context of its own. The splitter (z 700) and the Leaflet panes
+     (z 400+) then rank only against each other, and Mantine's portalled modals
+     and popovers (z 200–300) paint above the whole map area. Without this the
+     blue split bar showed through the Welcome modal. */
+  isolation: isolate;
   height: calc(100vh - 56px);
   overflow: hidden;
 }
@@ -226,4 +231,22 @@ html, body, #root {
    snapping back is the thing you want. */
 .splitter[data-off-centre='true']::after {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+/* Save modal: the 3×3 pin grid for each map. */
+.pin-grid {
+  width: 72px;
+}
+.pin-cell {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+}
+.pin-cell:hover {
+  border-color: var(--mantine-color-blue-4);
+}
+.pin-cell[data-on='true'] {
+  background: var(--mantine-color-blue-6);
+  border-color: var(--mantine-color-blue-6);
 }

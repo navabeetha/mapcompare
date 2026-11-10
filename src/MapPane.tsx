@@ -36,7 +36,7 @@ interface MapPaneProps {
   onStyleChange: (side: Side, style: MapStyle) => void;
   /** Active shape tool for this pane. 'off' makes existing shapes read-only. */
   shapeMode: ShapeMode;
-  /** Authoring affordances (search, tile-style picker) are hidden in view mode. */
+  /** Shows the per-pane search and tile-style picker. */
   showControls: boolean;
   shapes: MeasureShape[];
   selectedShapeId: string | null;
@@ -382,9 +382,6 @@ export function MapPane({
 
   return (
     <div className={`map-pane map-pane--${side}`}>
-      {/* View mode presents an authored comparison, so the per-pane authoring
-          controls come out. Pan and zoom stay — exploring the published
-          comparison is the point; re-aiming it at another city is not. */}
       {showControls && (
       <div className="pane-toolbar">
         <div style={{ flex: '1 1 auto', maxWidth: 400, minWidth: 0 }}>

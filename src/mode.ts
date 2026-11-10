@@ -1,10 +1,12 @@
 /**
  * Which half of the app you're looking at.
  *
- * - `tool` is the authoring surface: shape tools, grid controls, per-pane tile
- *   style, Save, Drafts and the export-to-clipboard flow.
- * - `view` is the published artefact: the authored comparison, presented for
- *   reading, with the editing affordances removed.
+ * - Both modes have the same tools: shape tools, grid controls, per-pane
+ *   search and tile style.
+ * - `tool` adds Save, local Drafts and the export-to-clipboard flow. It opens
+ *   empty.
+ * - `view` is the public site. It opens on the first curated comparison and
+ *   can't save. Public saving, maybe with curation, is a later decision.
  *
  * Both ship in the same bundle. There is nothing privileged to withhold — the
  * app has no backend and no keys, and "authoring" only writes to localStorage —
