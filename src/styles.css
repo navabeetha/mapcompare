@@ -257,13 +257,18 @@ html, body, #root {
   border-color: var(--mantine-color-blue-6);
 }
 
-/* "Hide map controls" (header eye button): a clean view of the two maps. Hides
-   the per-map search, the city cards and the zoom buttons. The scale bars stay,
-   because they're part of the comparison, and so do the map credits, which the
-   tile licences require. */
+/* "Hide map controls" (header button): a clean view of the two maps. Hides
+   the per-map search, the city cards, the zoom buttons, the scale bars and
+   the shape sizes and ratio panel, and the drawing hint. The map credits (.leaflet-control-
+   attribution) must STAY: the OpenStreetMap licence (ODbL) and Esri's terms
+   require visible attribution wherever their maps are shown. Don't add them
+   here. */
 .split-container[data-map-ui-hidden] .pane-toolbar,
 .split-container[data-map-ui-hidden] .data-card,
-.split-container[data-map-ui-hidden] .leaflet-control-zoom {
+.split-container[data-map-ui-hidden] .leaflet-control-zoom,
+.split-container[data-map-ui-hidden] .leaflet-control-scale,
+.split-container[data-map-ui-hidden] .measure-panel,
+.split-container[data-map-ui-hidden] .shape-hint {
   display: none;
 }
 
