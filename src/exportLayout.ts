@@ -5,12 +5,12 @@
  * Footer layout (CSS px; the drawer scales it to the image's pixel ratio):
  *
  *   ┌────────────────────────────────────────────────────────────┐
- *   │ Title (bold)                      navabeetha.github.io/... │
  *   │ Tokyo  [3 km |1 mi]                    [2 km |1 mi]  Paris │
- *   │ Leaflet | Tiles © Esri — … © OpenStreetMap contributors    │
+ *   │ navabeetha.github.io/mapcompare | Leaflet | Tiles © Esri … │
  *   └────────────────────────────────────────────────────────────┘
  *
- * The credits row is never dropped or cut: OpenStreetMap's licence and Esri's
+ * No title row: the city names by the scale bars already say it. The
+ * credits row is never dropped or cut: OpenStreetMap's licence and Esri's
  * terms require attribution on images of their maps too. It wraps instead.
  */
 import { displayTitle } from './projects';
@@ -92,39 +92,25 @@ export function wrapText(text: string, maxWidth: number, measure: (s: string) =>
   return lines;
 }
 
-export type FooterFont = 'title' | 'site' | 'credits';
+export type FooterFont = 'city' | 'credits';
 
 export interface FooterLayout {
   pad: number;
-  gap: number;
-  title: string;
-  titleH: number;
   scaleH: number;
-  creditLines: string[];
-  creditLineH: number;
+  /** "site | credits", wrapped. */
+  lines: string[];
+  lineH: number;
   height: number;
 }
 
 export function layoutFooter(
-  f: { width: number; title: string; site: string; credits: string },
+  f: { width: number; site: string; credits: string },
   measure: (s: string, font: FooterFont) => number,
 ): FooterLayout {
-  const pad = 16;
-  const gap = 24;
-  const titleH = 24;
-  const scaleH = 34;
-  const creditLineH = 15;
-  const inner = f.width - 2 * pad;
-
-  // The title gives way to the site address, never the other way round.
-  const room = inner - gap - measure(f.site, 'site');
-  let title = f.title;
-  if (measure(title, 'title') > room) {
-    while (title && measure(title + '…', 'title') > room) title = title.slice(0, -1);
-    title = title.trimEnd() + '…';
-  }
-
-  const creditLines = wrapText(f.credits, inner, (s) => measure(s, 'credits'));
-  const height = pad + titleH + scaleH + creditLines.length * creditLineH + pad;
-  return { pad, gap, title, titleH, scaleH, creditLines, creditLineH, height };
+  const pad = 14;
+  const scaleH = 30;
+  const lineH = 15;
+  const lines = wrapText(`${f.site} | ${f.credits}`, f.width - 2 * pad, (s) => measure(s, 'credits'));
+  const height = pad + scaleH + 6 + lines.length * lineH + pad - 4;
+  return { pad, scaleH, lines, lineH, height };
 }

@@ -67,8 +67,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
   if (!ctx) throw new Error('This browser cannot make images.');
 
   const fonts: Record<FooterFont, string> = {
-    title: `700 16px ${family}`,
-    site: `500 12px ${family}`,
+    city: `600 12px ${family}`,
     credits: `400 11px ${family}`,
   };
   const measure = (s: string, f: FooterFont) => {
@@ -78,7 +77,7 @@ export async function exportPng(input: ExportInput): Promise<void> {
   const credits = mergeCredits(
     [...container.querySelectorAll('.leaflet-control-attribution')].map((e) => e.textContent ?? ''),
   );
-  const footer = layoutFooter({ width: W, title, site: SITE, credits }, measure);
+  const footer = layoutFooter({ width: W, site: SITE, credits }, measure);
 
   const ratio = fitPixelRatio(W, H + footer.height, window.devicePixelRatio || 1);
   canvas.width = Math.round(W * ratio);
@@ -332,19 +331,9 @@ function drawFooter(
   ctx.fillStyle = C.border;
   ctx.fillRect(0, H, W, 1);
 
-  // Title, and the site address on the right.
-  let y = H + f.pad + 16;
-  ctx.font = fonts.title;
-  ctx.fillStyle = C.text;
-  ctx.fillText(f.title, f.pad, y);
-  ctx.font = fonts.site;
-  ctx.fillStyle = C.dim;
-  ctx.textAlign = 'right';
-  ctx.fillText(SITE, W - f.pad, y);
-  ctx.textAlign = 'left';
-
-  // Each map's scale bars, read from Leaflet's own (so they match the screen).
-  const top = H + f.pad + f.titleH + 4;
+  // Row 1: each map's city name and scale bars, read from Leaflet's own bars
+  // (so they match the screen): left map on the left, right map on the right.
+  const top = H + f.pad;
   for (const side of ['left', 'right'] as const) {
     const lines = [...container.querySelectorAll<HTMLElement>(`.map-pane--${side} .leaflet-control-scale-line`)].map(
       (l) => ({ text: l.textContent ?? '', w: l.offsetWidth }),
@@ -352,14 +341,22 @@ function drawFooter(
     drawScaleBars(ctx, lines, cities[side].name, side, side === 'left' ? f.pad : W - f.pad, top, family);
   }
 
-  // Credits: required, never cut, wrapped by layoutFooter.
-  y = H + f.pad + f.titleH + f.scaleH + 11;
+  // Row 2: "site | credits", wrapped by layoutFooter. The credits are required
+  // and never cut. The site address is a shade brighter than the credits.
+  let y = top + f.scaleH + 6 + 11;
   ctx.font = fonts.credits;
-  ctx.fillStyle = C.dim;
-  for (const line of f.creditLines) {
-    ctx.fillText(line, f.pad, y);
-    y += f.creditLineH;
-  }
+  f.lines.forEach((line, i) => {
+    let x = f.pad;
+    if (i === 0 && line.startsWith(SITE)) {
+      ctx.fillStyle = C.scale;
+      ctx.fillText(SITE, x, y);
+      x += ctx.measureText(SITE).width;
+      line = line.slice(SITE.length);
+    }
+    ctx.fillStyle = C.dim;
+    ctx.fillText(line, x, y);
+    y += f.lineH;
+  });
 }
 
 /** Leaflet-style stacked bars: metric on top, imperial below, labelled with the city. */

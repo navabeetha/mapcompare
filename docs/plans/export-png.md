@@ -1,6 +1,8 @@
 # Plan: export the comparison as a PNG
 
 Status: **built 2026-11-10** (footer kept, sizes panel left out, per Neela).
+Footer revised the same day: no title row; row 1 is each city with its scale
+bars, row 2 is "site | credits".
 Code: `src/exportLayout.ts` (pure, tested) and `src/exportImage.ts` (drawing).
 One change from the plan: MapLibre's maps are found through Leaflet's own
 layers and panes at export time, not through a registry.

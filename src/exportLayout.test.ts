@@ -93,19 +93,19 @@ describe('wrapText', () => {
   });
 });
 
-describe('layoutFooter', () => {
-  const base = { title: 'Tokyo vs Paris', site: 'navabeetha.github.io/mapcompare', credits: 'Leaflet | Tiles © Esri' };
+describe('layoutFooter: scale row, then "site | credits"', () => {
+  const base = { site: 'navabeetha.github.io/mapcompare', credits: 'Leaflet | Tiles © Esri' };
+  it('puts the site first, then " | ", then the credits', () => {
+    const f = layoutFooter({ ...base, width: 2000 }, measure);
+    expect(f.lines).toEqual(['navabeetha.github.io/mapcompare | Leaflet | Tiles © Esri']);
+  });
   it('never drops the credits: they wrap on a narrow image', () => {
-    const f = layoutFooter({ ...base, width: 200, credits: 'Leaflet | Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics' }, measure);
-    expect(f.creditLines.join(' ')).toBe('Leaflet | Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics');
-    expect(f.creditLines.length).toBeGreaterThan(1);
+    const credits = 'Leaflet | Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics';
+    const f = layoutFooter({ ...base, width: 400, credits }, measure);
+    expect(f.lines.length).toBeGreaterThan(1);
+    expect(f.lines.join(' ')).toBe(`${base.site} | ${credits}`);
   });
-  it('shortens a long title with an ellipsis so it never runs into the site', () => {
-    const f = layoutFooter({ ...base, width: 500, title: 'A very long comparison title that goes on and on' }, measure);
-    expect(f.title.endsWith('…')).toBe(true);
-    expect(measure(f.title) + f.gap + measure(base.site)).toBeLessThanOrEqual(500 - 2 * f.pad);
-  });
-  it('grows taller as the credits wrap', () => {
+  it('grows taller as the bottom row wraps', () => {
     const one = layoutFooter({ ...base, width: 2000 }, measure);
     const many = layoutFooter({ ...base, width: 200 }, measure);
     expect(many.height).toBeGreaterThan(one.height);
