@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Center, Divider, Group, Loader, Modal, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Center, Divider, Group, Loader, Menu, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { LuCopy, LuDownload, LuLink, LuX } from 'react-icons/lu';
+import { LuChevronDown, LuCopy, LuDownload, LuLink, LuX } from 'react-icons/lu';
 import { downloadBlob, type RenderedImage } from './exportImage';
-import { imageInfo } from './exportLayout';
+import { fileSize, imageInfo, type ImageFormat } from './exportLayout';
 
 /**
  * Share (header button). Two sections:
- *   - Image: a preview of the PNG (exportImage.ts) with Copy image and
- *     Download. The download is the very file previewed, not a second render.
+ *   - Image: a preview (exportImage.ts) with Copy image and a Download menu
+ *     offering PNG (lossless, large) or JPEG (much smaller), each with its
+ *     size. Both come from the same render as the preview, not a second one.
  *   - Link: for a comparison in Explore, its public link (`?project=<id>`),
  *     which opens it as published. Other views aren't stored anywhere a link
  *     could point to, so the modal says so instead.
@@ -26,6 +27,12 @@ interface Props {
   /** The open comparison's public link, if it's in Explore. */
   link: { url: string; title: string } | null;
 }
+
+/** The Download menu, in order. */
+const FORMATS: { format: ImageFormat; label: string; hint: string }[] = [
+  { format: 'png', label: 'PNG', hint: 'Full quality' },
+  { format: 'jpeg', label: 'JPEG', hint: 'Smaller file, for posts and messages' },
+];
 
 /** Copying an image needs the async clipboard and ClipboardItem (most modern browsers). */
 const canCopyImage = typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
@@ -46,7 +53,7 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
       const img = await render();
       if (run !== runRef.current) return;
       setImage(img);
-      setUrl(URL.createObjectURL(img.blob));
+      setUrl(URL.createObjectURL(img.files.png.blob));
     } catch (e) {
       if (run !== runRef.current) return;
       setError(e instanceof Error ? e.message : 'The image could not be made.');
@@ -84,7 +91,7 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
   async function copy() {
     if (!image) return;
     try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': image.blob })]);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': image.files.png.blob })]);
       notifications.show({ title: 'Copied', message: 'The image is on your clipboard. Paste it anywhere.', color: 'blue' });
     } catch {
       notifications.show({ title: 'Copy failed', message: 'The browser blocked the clipboard. Use Download instead.', color: 'red' });
@@ -117,7 +124,7 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
 
         <Group justify="space-between" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            {image ? imageInfo(image.width, image.height, image.blob.size) : ' '}
+            {image ? imageInfo(image.width, image.height) : ' '}
           </Text>
           <Group gap="xs" wrap="nowrap">
             {canCopyImage && (
@@ -125,14 +132,36 @@ export function ShareModal({ opened, onClose, render, link }: Props) {
                 Copy image
               </Button>
             )}
-            <Button
-              size="xs"
-              leftSection={<LuDownload size={14} />}
-              onClick={() => image && downloadBlob(image.blob, image.fileName)}
-              disabled={!image}
-            >
-              Download
-            </Button>
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <Button
+                  size="xs"
+                  leftSection={<LuDownload size={14} />}
+                  rightSection={<LuChevronDown size={14} />}
+                  disabled={!image}
+                >
+                  Download
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {FORMATS.map(({ format, label, hint }) => (
+                  <Menu.Item
+                    key={format}
+                    onClick={() => image && downloadBlob(image.files[format].blob, image.files[format].fileName)}
+                    rightSection={
+                      <Text size="xs" c="dimmed">
+                        {image ? fileSize(image.files[format].blob.size) : ''}
+                      </Text>
+                    }
+                  >
+                    <Text size="sm">{label}</Text>
+                    <Text size="xs" c="dimmed">
+                      {hint}
+                    </Text>
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
 

@@ -121,7 +121,8 @@ Explore (`draftNameClash`).
 ## Share (image export)
 
 Header → Share (both modes) opens `ShareModal.tsx`: a preview of the PNG with
-Copy image and Download (the same blob as the preview), then a Link section:
+Copy image (PNG) and a Download menu: PNG or JPEG (quality 0.9), both encoded
+from the same render as the preview, sizes shown. Then a Link section:
 for a comparison in Explore, its public `?project=<id>` link (`shareLink` in
 `exportLayout.ts`) with Copy link; other views can't be linked yet and the
 modal says so. Later sections (embed, more formats) go in this modal. `exportImage.ts` (`renderComparison`) redraws the maps

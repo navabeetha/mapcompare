@@ -127,14 +127,28 @@ describe('layoutFooter: scale row, then [logo] MapCompare + link on the left, cr
   });
 });
 
-import { imageInfo } from './exportLayout';
+import { fileSize, imageInfo } from './exportLayout';
 
 describe('imageInfo: the line under the Share preview', () => {
-  it('gives format, pixel size and file size', () => {
-    expect(imageInfo(3024, 1754, 1_234_567)).toBe('PNG · 3024 × 1754 px · 1.2 MB');
+  it('gives the pixel size (the formats and their file sizes are in the Download menu)', () => {
+    expect(imageInfo(3024, 1754)).toBe('3024 × 1754 px');
+  });
+});
+
+describe('fileSize: the size shown next to each format', () => {
+  it('uses MB from a megabyte up', () => {
+    expect(fileSize(1_234_567)).toBe('1.2 MB');
   });
   it('uses KB under a megabyte', () => {
-    expect(imageInfo(800, 600, 245_000)).toBe('PNG · 800 × 600 px · 239 KB');
+    expect(fileSize(245_000)).toBe('239 KB');
+  });
+});
+
+describe('exportFileName per format', () => {
+  it('ends in .png by default and .jpg for JPEG', () => {
+    expect(exportFileName('Tokyo vs Paris', 'png')).toBe('mapcompare-tokyo-vs-paris.png');
+    expect(exportFileName('Tokyo vs Paris', 'jpeg')).toBe('mapcompare-tokyo-vs-paris.jpg');
+    expect(exportFileName('', 'jpeg')).toBe('mapcompare.jpg');
   });
 });
 

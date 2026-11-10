@@ -19,7 +19,12 @@ import { displayTitle } from './projects';
 export const SITE = 'navabeetha.github.io/mapcompare';
 
 /** `mapcompare-tokyo-bay-vs-paris.png`; plain `mapcompare.png` if nothing usable is left. */
-export function exportFileName(title: string): string {
+/** The formats Share can save. Copy image is always PNG (what clipboards accept). */
+export type ImageFormat = 'png' | 'jpeg';
+
+const EXTENSION: Record<ImageFormat, string> = { png: 'png', jpeg: 'jpg' };
+
+export function exportFileName(title: string, format: ImageFormat = 'png'): string {
   const slug = title
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '') // accents, split off by NFKD
@@ -28,7 +33,8 @@ export function exportFileName(title: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
     .replace(/-+$/, '');
-  return slug ? `mapcompare-${slug}.png` : 'mapcompare.png';
+  const ext = EXTENSION[format];
+  return slug ? `mapcompare-${slug}.${ext}` : `mapcompare.${ext}`;
 }
 
 /** The open comparison's name, or "Left vs Right". */
@@ -135,9 +141,13 @@ export function layoutFooter(
 }
 
 /** "PNG · 3024 × 1754 px · 1.2 MB", shown under the Share preview. */
-export function imageInfo(width: number, height: number, bytes: number): string {
-  const size = bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
-  return `PNG · ${width} × ${height} px · ${size}`;
+export function imageInfo(width: number, height: number): string {
+  return `${width} × ${height} px`;
+}
+
+/** A file size for the Download menu: "1.2 MB", "239 KB". */
+export function fileSize(bytes: number): string {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
 }
 
 /** The public link that opens an Explore comparison (main.tsx reads `?project=`). */

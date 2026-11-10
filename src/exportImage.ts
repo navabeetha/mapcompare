@@ -32,6 +32,7 @@ import {
   SITE,
   type FooterFont,
   type FooterLayout,
+  type ImageFormat,
 } from './exportLayout';
 
 type Side = 'left' | 'right';
@@ -58,13 +59,27 @@ const C = {
   divider: '#228be6',
 };
 
-/** A finished image: the Share modal previews it and downloads the same blob. */
-export interface RenderedImage {
+/** One encoding of the finished image. */
+export interface ImageFile {
   blob: Blob;
-  width: number;
-  height: number;
   fileName: string;
 }
+
+/**
+ * A finished image, encoded both ways up front so the Download menu can show
+ * real file sizes and save at once. The preview and Copy image use the PNG.
+ * JPEG is far smaller for satellite views (often a tenth of the PNG); the
+ * canvas is fully painted first (`bg`), so JPEG's lack of transparency
+ * doesn't matter.
+ */
+export interface RenderedImage {
+  width: number;
+  height: number;
+  files: Record<ImageFormat, ImageFile>;
+}
+
+/** JPEG quality: 0.9 keeps label text and thin lines crisp. */
+const JPEG_QUALITY = 0.9;
 
 export async function renderComparison(input: ExportInput): Promise<RenderedImage> {
   const { container, maps, splitPct, title, cities } = input;
@@ -124,15 +139,19 @@ export async function renderComparison(input: ExportInput): Promise<RenderedImag
 
   drawFooter(ctx, footer, { W, H, family, fonts, container, cities, logo });
 
-  let blob: Blob | null;
-  try {
-    blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
-  } catch {
-    // A "tainted" canvas: some map image didn't allow being read back.
-    throw new Error('The browser blocked reading one of the map images. Reload the page and try again.');
-  }
-  if (!blob) throw new Error('The image could not be made.');
-  return { blob, width: canvas.width, height: canvas.height, fileName: exportFileName(title) };
+  const encode = async (format: ImageFormat): Promise<ImageFile> => {
+    let blob: Blob | null;
+    try {
+      blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, `image/${format}`, JPEG_QUALITY));
+    } catch {
+      // A "tainted" canvas: some map image didn't allow being read back.
+      throw new Error('The browser blocked reading one of the map images. Reload the page and try again.');
+    }
+    if (!blob) throw new Error('The image could not be made.');
+    return { blob, fileName: exportFileName(title, format) };
+  };
+  const [png, jpeg] = await Promise.all([encode('png'), encode('jpeg')]);
+  return { width: canvas.width, height: canvas.height, files: { png, jpeg } };
 }
 
 /** Saves a blob as a file through a temporary link. */
