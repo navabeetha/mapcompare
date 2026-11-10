@@ -96,9 +96,11 @@ runs after each load and publish). To change an Explore comparison: open it
 comparison at once, same id) or "Save to drafts", which needs a name not in
 Explore (`draftNameClash`).
 
-## Export PNG
+## Share (image export)
 
-Header → "Download as PNG" (both modes). `exportImage.ts` redraws the maps
+Header → Share (both modes) opens `ShareModal.tsx`: a preview of the PNG with
+Copy image and Download (the same blob as the preview). Later sections (link,
+embed, more formats) go in this modal. `exportImage.ts` (`renderComparison`) redraws the maps
 from the DOM onto a canvas in screen order (tiles → MapLibre → shapes SVG →
 grid → measurement labels), clips the right map at the split, and adds a
 footer (`exportLayout.ts`) with the title, both scale bars and the **map

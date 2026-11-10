@@ -2,7 +2,9 @@
 
 Status: **built 2026-11-10** (footer kept, sizes panel left out, per Neela).
 Footer revised the same day: no title row; row 1 is each city with its scale
-bars, row 2 is "site | credits".
+bars, row 2 is "site | credits". Then the button became **Share** (share
+icon), opening a modal with a preview, Copy image and Download; it's where a
+link, embed code and more formats will go.
 Code: `src/exportLayout.ts` (pure, tested) and `src/exportImage.ts` (drawing).
 One change from the plan: MapLibre's maps are found through Leaflet's own
 layers and panes at export time, not through a registry.

@@ -114,3 +114,9 @@ export function layoutFooter(
   const height = pad + scaleH + 6 + lines.length * lineH + pad - 4;
   return { pad, scaleH, lines, lineH, height };
 }
+
+/** "PNG · 3024 × 1754 px · 1.2 MB", shown under the Share preview. */
+export function imageInfo(width: number, height: number, bytes: number): string {
+  const size = bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+  return `PNG · ${width} × ${height} px · ${size}`;
+}

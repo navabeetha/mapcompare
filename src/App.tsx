@@ -22,7 +22,7 @@ import {
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
-import { LuImageDown, LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
+import { LuShare2, LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
 // Lucide pair for the map-controls toggle: a wireframe with top bar and side
 // panel (controls showing) vs the same frame left empty (clean canvas).
 import { LuPanelsTopLeft, LuSquare } from 'react-icons/lu';
@@ -65,7 +65,8 @@ import comparisonsJson from './data/comparisons.json';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
-import { exportPng } from './exportImage';
+import { renderComparison } from './exportImage';
+import { ShareModal } from './ShareModal';
 import { exportTitle } from './exportLayout';
 import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
@@ -169,7 +170,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
    * returns to exactly the state before, including the controls toggle.
    */
   const [fullscreen, setFullscreen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [shareOpened, { open: openShare, close: closeShare }] = useDisclosure(false);
   headerShown = !fullscreen;
 
   const enterFullscreen = useCallback(() => {
@@ -824,30 +825,19 @@ export default function App({ mode, initialProjectId }: AppProps) {
     }
   }
 
-  /** Export PNG: the comparison on screen, with a footer (exportImage.ts). */
-  async function handleExport() {
+  /** Share → image: the comparison on screen, with a footer (exportImage.ts). */
+  function renderShareImage() {
     const container = splitContainerRef.current;
     const left = leftMapRef.current;
     const right = rightMapRef.current;
-    if (!container || !left || !right) return;
-    setExporting(true);
-    try {
-      await exportPng({
-        container,
-        maps: { left, right },
-        splitPct,
-        title: exportTitle(openProject?.title, leftCity.name, rightCity.name),
-        cities: { left: leftCity, right: rightCity },
-      });
-    } catch (err) {
-      notifications.show({
-        title: 'Export failed',
-        message: err instanceof Error ? err.message : 'The image could not be made.',
-        color: 'red',
-      });
-    } finally {
-      setExporting(false);
-    }
+    if (!container || !left || !right) return Promise.reject(new Error('The maps are still loading.'));
+    return renderComparison({
+      container,
+      maps: { left, right },
+      splitPct,
+      title: exportTitle(openProject?.title, leftCity.name, rightCity.name),
+      cities: { left: leftCity, right: rightCity },
+    });
   }
 
   const loadProject = useCallback((project: Project) => {
@@ -1090,15 +1080,9 @@ export default function App({ mode, initialProjectId }: AppProps) {
             <Badge variant="light" color="gray" size="sm" radius="sm">
               Altitude: {altitudeM == null ? '—' : formatAltitude(altitudeM)}
             </Badge>
-            <Tooltip label="Download as PNG" withArrow position="bottom-end">
-              <ActionIcon
-                size="lg"
-                variant="default"
-                onClick={handleExport}
-                loading={exporting}
-                aria-label="Download as PNG"
-              >
-                <LuImageDown size={18} />
+            <Tooltip label="Share: image" withArrow position="bottom-end">
+              <ActionIcon size="lg" variant="default" onClick={openShare} aria-label="Share">
+                <LuShare2 size={18} />
               </ActionIcon>
             </Tooltip>
             <Tooltip label="Full screen: just the maps" withArrow position="bottom-end">
@@ -1303,6 +1287,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
         comparisons={published}
         onPick={handleLoadView}
       />
+      <ShareModal opened={shareOpened} onClose={closeShare} render={renderShareImage} />
       <SaveViewModal
         opened={saveOpened}
         defaultTitle={pendingTitle}

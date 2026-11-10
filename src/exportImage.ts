@@ -1,5 +1,6 @@
 /**
- * Export PNG: draws the comparison on screen into one image and downloads it.
+ * Share → image: draws the comparison on screen into one PNG
+ * (renderComparison). The Share modal previews it; downloadBlob saves it.
  *
  * No screenshot library: we redraw each map's layers onto a canvas in the
  * same order the screen stacks them, using where each element sits on screen
@@ -52,7 +53,15 @@ const C = {
   divider: '#228be6',
 };
 
-export async function exportPng(input: ExportInput): Promise<void> {
+/** A finished image: the Share modal previews it and downloads the same blob. */
+export interface RenderedImage {
+  blob: Blob;
+  width: number;
+  height: number;
+  fileName: string;
+}
+
+export async function renderComparison(input: ExportInput): Promise<RenderedImage> {
   const { container, maps, splitPct, title, cities } = input;
   await waitForMaps([maps.left, maps.right]);
 
@@ -116,10 +125,15 @@ export async function exportPng(input: ExportInput): Promise<void> {
     throw new Error('The browser blocked reading one of the map images. Reload the page and try again.');
   }
   if (!blob) throw new Error('The image could not be made.');
+  return { blob, width: canvas.width, height: canvas.height, fileName: exportFileName(title) };
+}
+
+/** Saves a blob as a file through a temporary link. */
+export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = exportFileName(title);
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();

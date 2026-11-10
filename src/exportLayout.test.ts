@@ -111,3 +111,14 @@ describe('layoutFooter: scale row, then "site | credits"', () => {
     expect(many.height).toBeGreaterThan(one.height);
   });
 });
+
+import { imageInfo } from './exportLayout';
+
+describe('imageInfo: the line under the Share preview', () => {
+  it('gives format, pixel size and file size', () => {
+    expect(imageInfo(3024, 1754, 1_234_567)).toBe('PNG · 3024 × 1754 px · 1.2 MB');
+  });
+  it('uses KB under a megabyte', () => {
+    expect(imageInfo(800, 600, 245_000)).toBe('PNG · 800 × 600 px · 239 KB');
+  });
+});
