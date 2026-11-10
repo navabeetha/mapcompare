@@ -8,7 +8,7 @@
       "visible": false,
       "overrideMeters": null
     },
-    "labels": true,
+    "labels": false,
     "borders": [],
     "left": {
       "city": {
@@ -40,7 +40,7 @@
       },
       "lat": 45.43875697917051,
       "lng": 12.295789141623342,
-      "zoom": 13.700760849121808,
+      "zoom": 13.700855193728728,
       "style": "satellite",
       "shapes": []
     },
