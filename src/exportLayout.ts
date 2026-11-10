@@ -139,3 +139,8 @@ export function imageInfo(width: number, height: number, bytes: number): string 
   const size = bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
   return `PNG · ${width} × ${height} px · ${size}`;
 }
+
+/** The public link that opens an Explore comparison (main.tsx reads `?project=`). */
+export function shareLink(projectId: string): string {
+  return `https://${SITE}/?project=${encodeURIComponent(projectId)}`;
+}

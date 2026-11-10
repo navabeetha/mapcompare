@@ -137,3 +137,14 @@ describe('imageInfo: the line under the Share preview', () => {
     expect(imageInfo(800, 600, 245_000)).toBe('PNG · 800 × 600 px · 239 KB');
   });
 });
+
+import { shareLink } from './exportLayout';
+
+describe('shareLink: the public link to an Explore comparison', () => {
+  it('opens the public site on that comparison', () => {
+    expect(shareLink('abc-123')).toBe('https://navabeetha.github.io/mapcompare/?project=abc-123');
+  });
+  it('encodes ids safely', () => {
+    expect(shareLink('a b&c')).toBe('https://navabeetha.github.io/mapcompare/?project=a%20b%26c');
+  });
+});

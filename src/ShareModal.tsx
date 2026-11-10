@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Center, Group, Loader, Modal, Stack, Text } from '@mantine/core';
+import { Alert, Button, Center, Divider, Group, Loader, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { LuCopy, LuDownload, LuX } from 'react-icons/lu';
+import { LuCopy, LuDownload, LuLink, LuX } from 'react-icons/lu';
 import { downloadBlob, type RenderedImage } from './exportImage';
 import { imageInfo } from './exportLayout';
 
 /**
- * Share (header button). For now one section, Image: a preview of the PNG
- * (exportImage.ts) with Copy image and Download. The download is the very
- * file previewed, not a second render. Later sections slot in below it, e.g.
- * a link or embed code, or more image formats.
+ * Share (header button). Two sections:
+ *   - Image: a preview of the PNG (exportImage.ts) with Copy image and
+ *     Download. The download is the very file previewed, not a second render.
+ *   - Link: for a comparison in Explore, its public link (`?project=<id>`),
+ *     which opens it as published. Other views aren't stored anywhere a link
+ *     could point to, so the modal says so instead.
+ * Later sections (embed code, more formats) slot in below.
  *
  * The image is made each time the modal opens, from the maps as they are
  * then. The modal sits over the maps, but rendering reads the maps' own
@@ -20,12 +23,14 @@ interface Props {
   onClose: () => void;
   /** Makes the image of the comparison on screen. */
   render: () => Promise<RenderedImage>;
+  /** The open comparison's public link, if it's in Explore. */
+  link: { url: string; title: string } | null;
 }
 
 /** Copying an image needs the async clipboard and ClipboardItem (most modern browsers). */
 const canCopyImage = typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
 
-export function ShareModal({ opened, onClose, render }: Props) {
+export function ShareModal({ opened, onClose, render, link }: Props) {
   const [image, setImage] = useState<RenderedImage | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +70,16 @@ export function ShareModal({ opened, onClose, render }: Props) {
   useEffect(() => {
     if (!opened) setUrl(null);
   }, [opened]);
+
+  async function copyLink() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      notifications.show({ title: 'Link copied', message: `Opens "${link.title}" on MapCompare.`, color: 'blue' });
+    } catch {
+      notifications.show({ title: 'Copy failed', message: 'The browser blocked the clipboard. Select the link and copy it.', color: 'red' });
+    }
+  }
 
   async function copy() {
     if (!image) return;
@@ -120,6 +135,35 @@ export function ShareModal({ opened, onClose, render }: Props) {
             </Button>
           </Group>
         </Group>
+
+        <Divider my={4} />
+        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+          Link
+        </Text>
+        {link ? (
+          <>
+            <Group gap="xs" wrap="nowrap">
+              <TextInput
+                size="xs"
+                style={{ flex: 1 }}
+                value={link.url}
+                readOnly
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label="Link to this comparison"
+              />
+              <Button size="xs" variant="default" leftSection={<LuLink size={14} />} onClick={copyLink}>
+                Copy link
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Opens “{link.title}” as it’s saved in Explore, so changes you’ve made since opening it aren’t included.
+            </Text>
+          </>
+        ) : (
+          <Text size="xs" c="dimmed">
+            Links work for comparisons in Explore. This view isn’t one of them, so share the image instead.
+          </Text>
+        )}
       </Stack>
     </Modal>
   );

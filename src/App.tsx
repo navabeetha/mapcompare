@@ -69,7 +69,7 @@ import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin
 import { toMapStyle, type MapStyle } from './tileLayers';
 import { renderComparison } from './exportImage';
 import { ShareModal } from './ShareModal';
-import { exportTitle } from './exportLayout';
+import { exportTitle, shareLink } from './exportLayout';
 import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
@@ -1306,7 +1306,16 @@ export default function App({ mode, initialProjectId }: AppProps) {
         comparisons={published}
         onPick={handleLoadView}
       />
-      <ShareModal opened={shareOpened} onClose={closeShare} render={renderShareImage} />
+      <ShareModal
+        opened={shareOpened}
+        onClose={closeShare}
+        render={renderShareImage}
+        link={
+          openFromExplore
+            ? { url: shareLink(openFromExplore.id), title: displayTitle(openFromExplore.title) }
+            : null
+        }
+      />
       <SaveViewModal
         opened={saveOpened}
         defaultTitle={pendingTitle}
