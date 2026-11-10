@@ -12,8 +12,9 @@
  *   → measurement labels (HTML tooltips, z 650)
  *
  * The right map is clipped at the divider, as on screen. Buttons, search,
- * zoom, panels and shape handles (HTML markers) are simply never drawn.
- * Then city names, the divider and the footer (exportLayout.ts) go on.
+ * zoom, panels, city cards and shape handles (HTML markers) are never
+ * drawn. Then the divider and the footer (exportLayout.ts) go on; the city
+ * names and countries sit in the footer, by each map's scale bars.
  *
  * Reading pixels back needs every source to allow it (CORS): Esri tiles are
  * loaded with crossOrigin (tileLayers.ts); OpenFreeMap allows it too. A
@@ -104,7 +105,6 @@ export async function renderComparison(input: ExportInput): Promise<RenderedImag
     ctx.rect(crop.x, 0, crop.width, H);
     ctx.clip();
     await drawPane(ctx, pane, maps[side], box);
-    drawCityCard(ctx, cities[side], side === 'left' ? 12 : W - 12, side, family);
     ctx.restore();
   }
 
@@ -292,41 +292,6 @@ function drawPill(ctx: CanvasRenderingContext2D, el: HTMLElement, r: Box): void 
   ctx.textBaseline = 'alphabetic';
 }
 
-/** City name and country in the top corner, like the on-screen city cards. */
-function drawCityCard(
-  ctx: CanvasRenderingContext2D,
-  city: { name: string; country: string },
-  edgeX: number,
-  side: Side,
-  family: string,
-): void {
-  const nameFont = `600 14px ${family}`;
-  const countryFont = `400 12px ${family}`;
-  ctx.font = nameFont;
-  const nw = ctx.measureText(city.name).width;
-  ctx.font = countryFont;
-  const cw = city.country ? ctx.measureText(city.country).width : 0;
-  const w = Math.max(nw, cw) + 20;
-  const h = city.country ? 46 : 30;
-  const x = side === 'left' ? edgeX : edgeX - w;
-  const y = 12;
-  ctx.fillStyle = C.card;
-  ctx.strokeStyle = C.border;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = C.text;
-  ctx.font = nameFont;
-  ctx.fillText(city.name, x + 10, y + 20);
-  if (city.country) {
-    ctx.fillStyle = C.dim;
-    ctx.font = countryFont;
-    ctx.fillText(city.country, x + 10, y + 37);
-  }
-}
-
 // ------------------------------------------------------------ footer
 
 function drawFooter(
@@ -352,7 +317,7 @@ function drawFooter(
     const lines = [...container.querySelectorAll<HTMLElement>(`.map-pane--${side} .leaflet-control-scale-line`)].map(
       (l) => ({ text: l.textContent ?? '', w: l.offsetWidth }),
     );
-    drawScaleBars(ctx, lines, cities[side].name, side, side === 'left' ? f.pad : W - f.pad, top, family);
+    drawScaleBars(ctx, lines, cities[side], side, side === 'left' ? f.pad : W - f.pad, top, family);
   }
 
   // Row 2: "site | credits", wrapped by layoutFooter. The credits are required
@@ -373,11 +338,11 @@ function drawFooter(
   });
 }
 
-/** Leaflet-style stacked bars: metric on top, imperial below, labelled with the city. */
+/** Leaflet-style stacked bars (metric on top, imperial below), labelled with city and country. */
 function drawScaleBars(
   ctx: CanvasRenderingContext2D,
   lines: { text: string; w: number }[],
-  city: string,
+  city: { name: string; country: string },
   side: Side,
   edgeX: number,
   top: number,
@@ -386,12 +351,24 @@ function drawScaleBars(
   if (lines.length === 0) return;
   const barH = 13;
   const maxW = Math.max(...lines.map((l) => l.w));
-  ctx.font = `600 12px ${family}`;
-  const cityW = ctx.measureText(city).width;
-  // Left: "City  [bars]". Right: "[bars]  City".
-  const barsX = side === 'left' ? edgeX + cityW + 10 : edgeX - cityW - 10 - maxW;
+  const nameFont = `600 12px ${family}`;
+  const countryFont = `400 11px ${family}`;
+  ctx.font = nameFont;
+  const nameW = ctx.measureText(city.name).width;
+  ctx.font = countryFont;
+  const countryW = city.country ? ctx.measureText(city.country).width : 0;
+  const labelW = Math.max(nameW, countryW);
+  // Left: "City / Country  [bars]". Right: "[bars]  City / Country".
+  const barsX = side === 'left' ? edgeX + labelW + 10 : edgeX - labelW - 10 - maxW;
+  const labelX = side === 'left' ? edgeX : edgeX - labelW;
   ctx.fillStyle = C.text;
-  ctx.fillText(city, side === 'left' ? edgeX : edgeX - cityW, top + barH + 4);
+  ctx.font = nameFont;
+  ctx.fillText(city.name, labelX, top + 11);
+  if (city.country) {
+    ctx.fillStyle = C.dim;
+    ctx.font = countryFont;
+    ctx.fillText(city.country, labelX, top + 25);
+  }
 
   ctx.strokeStyle = C.scale;
   ctx.lineWidth = 1;

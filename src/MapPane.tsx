@@ -16,6 +16,9 @@ import type { BorderLevel } from './vectorStyle';
 import { createSatelliteLayer, createVectorLayer, LABELS_PANE, type MapStyle } from './tileLayers';
 import { drawScaleGrid } from './GridLayer';
 import { ShapeLayer } from './ShapeLayer';
+import { HarmonizedScaleControl } from './ScaleControl';
+import type { HarmonizedScale } from './scaleBar';
+import { metersPerPixel } from './altitude';
 import type { MeasureShape, ShapeMode } from './shapes';
 
 type Side = 'left' | 'right';
@@ -42,6 +45,8 @@ interface MapPaneProps {
   /** Shows the per-pane search and tile-style picker. */
   showControls: boolean;
   shapes: MeasureShape[];
+  /** Scale bar distances shared by both maps and the grid (App, scaleBar.ts). */
+  scale: HarmonizedScale;
   /** The Layers menu's Annotations switch: false hides every shape. */
   shapesVisible: boolean;
   selectedShapeId: string | null;
@@ -131,6 +136,7 @@ export function MapPane({
   showControls,
   shapes,
   shapesVisible,
+  scale,
   selectedShapeId,
   query,
   onQueryChange,
@@ -148,6 +154,10 @@ export function MapPane({
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const firstLoadDoneRef = useRef(false);
   const shapeLayerRef = useRef<ShapeLayer | null>(null);
+  const scaleCtlRef = useRef<HarmonizedScaleControl | null>(null);
+  // Read by the map's move handler, which is set up once.
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
   // The shape layer is built once and then driven by props. Its callbacks are
   // read through refs so the layer never has to be torn down and rebuilt just
   // because a parent handler got a new identity — a rebuild mid-drag would drop
@@ -200,7 +210,12 @@ export function MapPane({
     // the tile layer, which registers its attribution with it.
     const corner = side === 'left' ? 'bottomleft' : 'bottomright';
     L.control.attribution({ position: corner }).addTo(map);
-    L.control.scale({ position: corner, imperial: true, metric: true }).addTo(map);
+    // Not Leaflet's own scale: ours shows the same distances on both maps.
+    const scaleCtl = new HarmonizedScaleControl({ position: corner }).addTo(map);
+    const updateScale = () => scaleCtl.set(scaleRef.current, metersPerPixel(map.getZoom(), map.getCenter().lat));
+    map.on('move zoom', updateScale);
+    scaleCtlRef.current = scaleCtl;
+    updateScale();
     // Labels over satellite sit above the imagery but below the shapes, and
     // never catch clicks meant for the map or a shape.
     const labelsPane = map.createPane(LABELS_PANE);
@@ -374,6 +389,11 @@ export function MapPane({
   useEffect(() => {
     shapeLayerRef.current?.setVisible(shapesVisible);
   }, [shapesVisible]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) scaleCtlRef.current?.set(scale, metersPerPixel(map.getZoom(), map.getCenter().lat));
+  }, [scale]);
 
   useEffect(() => {
     shapeLayerRef.current?.select(selectedShapeId);

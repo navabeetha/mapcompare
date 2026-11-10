@@ -38,6 +38,7 @@ import {
   metersPerPixel,
 } from './altitude';
 import { computeGridStep } from './GridLayer';
+import { harmonizedScale } from './scaleBar';
 import { formatArea } from './geometry';
 import {
   measureShape,
@@ -220,6 +221,10 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const [gridStepPx, setGridStepPx] = useState(100);
   const [gridStepMeters, setGridStepMeters] = useState(100);
   const [gridOverrideMeters, setGridOverrideMeters] = useState<number | null>(null);
+  // Metres per pixel of the grid's reference (left map). The scale bars on
+  // both maps use the grid's distance, so bars and grid always agree.
+  const [scaleMpp, setScaleMpp] = useState(20);
+  const scale = useMemo(() => harmonizedScale({ mpp: scaleMpp, gridStepMeters }), [scaleMpp, gridStepMeters]);
   const [shapeMode, setShapeMode] = useState<ShapeMode>('off');
   const [leftShapes, setLeftShapes] = useState<MeasureShape[]>([]);
   const [rightShapes, setRightShapes] = useState<MeasureShape[]>([]);
@@ -359,6 +364,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const recomputeGrid = useCallback((zoom: number, lat: number) => {
     const override = gridOverrideRef.current;
     const mPerPx = metersPerPixel(zoom, lat);
+    if (isFinite(mPerPx) && mPerPx > 0) setScaleMpp(mPerPx);
     if (override != null && isFinite(mPerPx) && mPerPx > 0) {
       setGridStepPx(override / mPerPx);
       setGridStepMeters(override);
@@ -1117,6 +1123,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               shapeMode={shapeMode}
               shapes={leftShapes}
               shapesVisible={annotationsVisible}
+              scale={scale}
               selectedShapeId={selected?.side === 'left' ? selected.id : null}
               query={leftQuery}
               onQueryChange={setLeftQuery}
@@ -1145,6 +1152,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               shapeMode={shapeMode}
               shapes={rightShapes}
               shapesVisible={annotationsVisible}
+              scale={scale}
               selectedShapeId={selected?.side === 'right' ? selected.id : null}
               query={rightQuery}
               onQueryChange={setRightQuery}

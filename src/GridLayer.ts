@@ -3,7 +3,7 @@ import { metersPerPixel } from './altitude';
 const TARGET_PX_SPACING = 100;
 const CHECKER_ALPHA = 0.1;
 
-function niceNumber(value: number): number {
+export function niceNumber(value: number): number {
   if (value <= 0) return 1;
   const exp = Math.floor(Math.log10(value));
   const fraction = value / Math.pow(10, exp);

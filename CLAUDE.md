@@ -69,6 +69,15 @@ Run before every push. `npm run check` covers the automated part.
   trips through React (`mutate → onChange → setShapes`), and rebuilding handles
   there would delete the marker Leaflet is dragging.
 
+## Scale bars
+
+Both maps show the **same round distances**, and the km bar equals the scale
+grid's cell length (`scaleBar.ts`, `ScaleControl.ts`; Leaflet's own scale
+control is not used). The distance comes from the grid's reference (the
+left map); each map draws it at its own metres per pixel, so bar lengths stay
+true. A fixed grid length the author set is used while it gives a readable
+bar (40–240 px), otherwise the automatic one.
+
 ## Schema
 
 `Project` (`projects.ts`, `schemaVersion: 2`) is the unit of saved work: both
