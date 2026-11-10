@@ -8,7 +8,7 @@ See [DOCUMENTATION.md](./DOCUMENTATION.md) for the full feature spec, user stori
 - **Vite + React + TypeScript** — static client-only build
 - **Mantine v9** — UI components
 - **Leaflet** — map rendering (MIT)
-- **CartoDB Voyager / Esri World Imagery** tiles — free public tile servers
+- **OpenFreeMap** (Map view and labels, OpenStreetMap data) and **Esri World Imagery** (Satellite): free, keyless tile servers
 - **Nominatim** — free OSM-hosted geocoding for search
 
 All open source. No API keys required.

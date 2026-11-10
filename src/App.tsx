@@ -7,10 +7,6 @@ import {
   Title,
   Button,
   Badge,
-  Switch,
-  Popover,
-  NumberInput,
-  SegmentedControl,
   Paper,
   Text,
   Divider,
@@ -47,6 +43,7 @@ import {
 } from './shapes';
 import { AboutModal } from './AboutModal';
 import { SaveViewModal } from './SaveViewModal';
+import { LayersMenu } from './LayersMenu';
 import { ExploreMenu } from './ExploreMenu';
 import {
   createProjectId,
@@ -60,7 +57,7 @@ import {
 import { CURATED_VIEWS } from './curatedViews';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
-import type { MapStyle } from './tileLayers';
+import { toMapStyle, type MapStyle } from './tileLayers';
 
 /**
  * The comparisons that ship with the build. They are still authored in the v1
@@ -128,8 +125,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
 
   const [leftCity, setLeftCity] = useState<CityPreset>(CITIES.tokyo);
   const [rightCity, setRightCity] = useState<CityPreset>(CITIES.paris);
-  const [leftStyle, setLeftStyle] = useState<MapStyle>('satellite');
-  const [rightStyle, setRightStyle] = useState<MapStyle>('satellite');
+  /** Base view for both maps (Layers menu). Satellite with labels by default. */
+  const [mapStyle, setMapStyle] = useState<MapStyle>('satellite');
   /** Title/description of the project currently on screen, shown in view mode. */
   const [openProject, setOpenProject] = useState<Project | null>(null);
   const [leftQuery, setLeftQuery] = useState('');
@@ -140,6 +137,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
   // would otherwise be a no-op state update and never apply its anchor.
   const [pinToken, setPinToken] = useState(0);
   const [gridVisible, setGridVisible] = useState(false);
+  /** Place-name labels on both maps (Layers menu). Saved with a project. */
+  const [labelsVisible, setLabelsVisible] = useState(true);
   const [gridStepPx, setGridStepPx] = useState(100);
   const [gridStepMeters, setGridStepMeters] = useState(100);
   const [gridOverrideMeters, setGridOverrideMeters] = useState<number | null>(null);
@@ -149,9 +148,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
   // At most one shape is selected across both panes, so the mirror and delete
   // actions always have an unambiguous target.
   const [selected, setSelected] = useState<{ side: Side; id: string } | null>(null);
-  const [gridPopoverOpen, setGridPopoverOpen] = useState(false);
-  const [gridInput, setGridInput] = useState<number | string>('');
-  const [gridUnit, setGridUnit] = useState<'m' | 'km'>('km');
   const [altitudeM, setAltitudeM] = useState<number | null>(null);
   // Welcome flow: the modal opens on every load and pauses over the maps while
   // they fetch tiles in the background. The header About button reopens it.
@@ -301,11 +297,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
     },
     [recomputeGrid]
   );
-
-  const handleStyleChange = useCallback((side: Side, style: MapStyle) => {
-    if (side === 'left') setLeftStyle(style);
-    else setRightStyle(style);
-  }, []);
 
   const handleShapesChange = useCallback((side: Side, next: MeasureShape[]) => {
     if (side === 'left') setLeftShapes(next);
@@ -657,12 +648,13 @@ export default function App({ mode, initialProjectId }: AppProps) {
         title,
         splitPct,
         grid: { visible: gridVisible, overrideMeters: gridOverrideMeters },
+        labels: labelsVisible,
         left: {
           city: leftCity,
           lat: leftMap.getCenter().lat,
           lng: leftMap.getCenter().lng,
           zoom: leftMap.getZoom(),
-          style: leftStyle,
+          style: mapStyle,
           shapes: leftShapes,
           pin: pinFor('left', leftMap),
         },
@@ -671,7 +663,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
           lat: rightMap.getCenter().lat,
           lng: rightMap.getCenter().lng,
           zoom: rightMap.getZoom(),
-          style: rightStyle,
+          style: mapStyle,
           shapes: rightShapes,
           pin: pinFor('right', rightMap),
         },
@@ -704,12 +696,16 @@ export default function App({ mode, initialProjectId }: AppProps) {
     setOpenProject(project);
     setLeftCity(project.left.city);
     setRightCity(project.right.city);
-    setLeftStyle(project.left.style);
-    setRightStyle(project.right.style);
+    // One view for both maps now. Older saves stored one per map; the left
+    // map's wins.
+    setMapStyle(toMapStyle(project.left.style));
     setLeftShapes(project.left.shapes);
     setRightShapes(project.right.shapes);
     setSelected(null);
     setGridVisible(project.grid.visible);
+    // Labels are on by default, including for comparisons saved before the
+    // switch existed.
+    setLabelsVisible(project.labels ?? true);
     applyGridOverride(project.grid.overrideMeters);
 
     // Recompute the right pane's zoom from the left rather than trusting what
@@ -821,95 +817,17 @@ export default function App({ mode, initialProjectId }: AppProps) {
               </Group>
             )}
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
-              <Group gap={6} wrap="nowrap" align="center">
-                <Switch
-                  size="sm"
-                  checked={gridVisible}
-                  onChange={(e) => setGridVisible(e.currentTarget.checked)}
-                  label="Scale grid"
-                  labelPosition="left"
-                  styles={{
-                    body: { alignItems: 'center' },
-                    labelWrapper: { display: 'flex', alignItems: 'center' },
-                    label: { fontSize: 12, color: 'var(--mantine-color-dimmed)' },
-                  }}
-                />
-                {gridVisible && (
-                <Popover
-                  opened={gridPopoverOpen}
-                  onChange={setGridPopoverOpen}
-                  position="bottom"
-                  withArrow
-                  shadow="md"
-                >
-                  <Popover.Target>
-                    <Badge
-                      variant={gridOverrideMeters != null ? 'filled' : 'light'}
-                      color="blue"
-                      size="sm"
-                      radius="sm"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => {
-                        setGridInput(
-                          gridStepMeters >= 1000
-                            ? +(gridStepMeters / 1000).toFixed(2)
-                            : Math.round(gridStepMeters)
-                        );
-                        setGridUnit(gridStepMeters >= 1000 ? 'km' : 'm');
-                        setGridPopoverOpen((o) => !o);
-                      }}
-                    >
-                      {formatDistance(gridStepMeters)}
-                      {gridOverrideMeters != null ? ' (fixed)' : ''}
-                    </Badge>
-                  </Popover.Target>
-                  <Popover.Dropdown>
-                    <Group gap="xs" align="flex-end" wrap="nowrap">
-                      <NumberInput
-                        label="Grid length"
-                        size="xs"
-                        min={0}
-                        w={110}
-                        value={gridInput}
-                        onChange={setGridInput}
-                      />
-                      <SegmentedControl
-                        size="xs"
-                        value={gridUnit}
-                        onChange={(v) => setGridUnit(v as 'm' | 'km')}
-                        data={[
-                          { label: 'm', value: 'm' },
-                          { label: 'km', value: 'km' },
-                        ]}
-                      />
-                    </Group>
-                    <Group gap="xs" mt="sm" justify="space-between">
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        onClick={() => {
-                          applyGridOverride(null);
-                          setGridPopoverOpen(false);
-                        }}
-                      >
-                        Reset to auto
-                      </Button>
-                      <Button
-                        size="xs"
-                        onClick={() => {
-                          const meters =
-                            Number(gridInput) * (gridUnit === 'km' ? 1000 : 1);
-                          if (meters > 0) applyGridOverride(meters);
-                          setGridPopoverOpen(false);
-                        }}
-                      >
-                        Set
-                      </Button>
-                    </Group>
-                  </Popover.Dropdown>
-                </Popover>
-                )}
-              </Group>
+              <LayersMenu
+                gridVisible={gridVisible}
+                onGridVisibleChange={setGridVisible}
+                gridStepMeters={gridStepMeters}
+                gridOverrideMeters={gridOverrideMeters}
+                onGridOverride={applyGridOverride}
+                labelsVisible={labelsVisible}
+                onLabelsVisibleChange={setLabelsVisible}
+                mapStyle={mapStyle}
+                onMapStyleChange={setMapStyle}
+              />
               <Divider
                 orientation="vertical"
                 style={{ height: 24, alignSelf: 'center' }}
@@ -1016,8 +934,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
               city={leftCity}
               gridVisible={gridVisible}
               gridStepPx={gridStepPx}
-              style={leftStyle}
-              onStyleChange={handleStyleChange}
+              style={mapStyle}
+              labels={labelsVisible}
               showControls
               shapeMode={shapeMode}
               shapes={leftShapes}
@@ -1042,8 +960,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
               city={rightCity}
               gridVisible={gridVisible}
               gridStepPx={gridStepPx}
-              style={rightStyle}
-              onStyleChange={handleStyleChange}
+              style={mapStyle}
+              labels={labelsVisible}
               showControls
               shapeMode={shapeMode}
               shapes={rightShapes}

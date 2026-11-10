@@ -42,6 +42,8 @@ export interface Project {
   /** Splitter position as a percentage of container width. */
   splitPct: number;
   grid: { visible: boolean; overrideMeters: number | null };
+  /** Place-name labels on both maps. Missing (older saves) means off. */
+  labels?: boolean;
   left: PaneState;
   right: PaneState;
   createdAt: number;

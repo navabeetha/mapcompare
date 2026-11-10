@@ -56,6 +56,15 @@ comparisons.
 - This replaces "Export drafts to clipboard". Keep a plain "Copy JSON" as a
   backup way out.
 
+## Step 4: author notes on the map (with the Explore deep dive)
+
+- The author places short text notes on either map, for example "Old city
+  walls" or "Same size as Central Park". They're saved with the comparison and
+  shown to readers.
+- Probably a new shape kind, `note`: one point plus text. It reuses the shape
+  layer, the save format and the mirror-to-other-map behaviour.
+- Readers see the notes but can't edit them, unless public saving arrives.
+
 ## Later, not in this plan
 
 - Public saving with curation: visitors submit and the author approves. That

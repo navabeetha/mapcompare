@@ -56,8 +56,9 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
               so one pixel covers the same real-world distance on both.
             </List.Item>
             <List.Item>
-              Toggle the <strong>Scale grid</strong> to overlay matching cells,
-              and click its length to pin a fixed grid size.
+              Open <strong>Layers</strong> to switch both maps between
+              Satellite and Map, turn place-name labels or the scale grid on
+              and off, and fix the grid cell length.
             </List.Item>
             <List.Item>
               <strong>Draw</strong> a path, circle or polygon to measure ground
@@ -111,7 +112,7 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
                   are set.
                 </List.Item>
                 <List.Item>
-                  Tile providers used here (OSM, Esri imagery, OpenTopoMap) only
+                  Tile providers used here (OpenFreeMap, Esri imagery) only
                   serve Web Mercator tiles, which constrains the projection
                   options below.
                 </List.Item>
@@ -141,10 +142,12 @@ export function AboutModal({ opened, onClose }: AboutModalProps) {
         <Text size="xs" c="dimmed">
           Built with React, <Anchor href="https://mantine.dev">Mantine</Anchor>,{' '}
           <Anchor href="https://leafletjs.com">Leaflet</Anchor>,{' '}
-          <Anchor href="https://www.openstreetmap.org">OpenStreetMap</Anchor>,
-          and{' '}
-          <Anchor href="https://nominatim.org">Nominatim</Anchor> — all open
-          source.
+          <Anchor href="https://maplibre.org">MapLibre</Anchor>,{' '}
+          <Anchor href="https://www.openstreetmap.org">OpenStreetMap</Anchor> data
+          via <Anchor href="https://openfreemap.org">OpenFreeMap</Anchor>, and{' '}
+          <Anchor href="https://nominatim.org">Nominatim</Anchor>, all open
+          source. Satellite imagery is from Esri: free to use, but not open
+          data.
         </Text>
 
         <Divider />

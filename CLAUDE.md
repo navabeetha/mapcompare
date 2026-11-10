@@ -89,8 +89,13 @@ before `zoomSnap: 0` land exactly scale-matched.
   they need a real map to exercise. Testing them means either jsdom-mounting
   Leaflet or a Playwright layer — neither exists yet, so browser verification
   stands in.
-- **The MAP basemap is broken.** CartoDB now gates its Voyager tiles behind an
-  API key and serves "API KEY REQUIRED" watermarks. Only affects authoring; every
-  curated project renders satellite. Fix is a keyless provider in `tileLayers.ts`.
+- **Map views and labels.** Map view and the labels over satellite are vector
+  layers from OpenFreeMap, drawn by MapLibre (`labels.ts`, `tileLayers.ts`).
+  MapLibre is lazy-loaded, so satellite-only sessions never fetch it. Its worker
+  URL must be set explicitly (`setWorkerUrl`), or Vite's bundling breaks it with
+  "Worker failed to load". Both maps share one view (Satellite or Map), chosen
+  in the Layers menu. The default is satellite with labels on. A Topo view
+  (OpenTopoMap) was tried and dropped as hard to read. CARTO, the old Map
+  view, now needs an API key and is gone.
 - **First load is not scale-matched** in tool mode — both cities open at their
   preset zoom until you interact. A sync in `handleReady` would close it.

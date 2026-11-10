@@ -45,7 +45,7 @@ Quick comparisons with curated structural pairings:
 - **Scale Bars**: Real-time scale bars displaying metric and imperial divisions adjusted for the map's current latitude.
 - **Comparison Indicators**: Dynamic statistics detailing the city's Country, Population Area ($\text{km}^2$), and a hand-crafted curio/fun-fact about its planning limits.
 - **Grids**: An optional reference grid overlay showing geographic spacing.
-- **Map Styles**: Quick-toggle map types between **Roadmap**, **Satellite**, and **Terrain** individually for both layers.
+- **Layers menu**: Shared by both maps. It holds the view (**Satellite** or **Map**), place-name labels (countries, regions, cities, districts, seas) and the scale grid. The default is satellite with labels on. A saved comparison remembers the view and the labels setting.
 
 ---
 

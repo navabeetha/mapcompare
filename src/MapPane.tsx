@@ -6,14 +6,13 @@ import {
   Loader,
   LoadingOverlay,
   Paper,
-  SegmentedControl,
   Text,
   TextInput,
   useCombobox,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import type { CityPreset } from './presets';
-import { createTileLayer, type MapStyle } from './tileLayers';
+import { createSatelliteLayer, createVectorLayer, LABELS_PANE, type MapStyle } from './tileLayers';
 import { drawScaleGrid } from './GridLayer';
 import { ShapeLayer } from './ShapeLayer';
 import type { MeasureShape, ShapeMode } from './shapes';
@@ -33,7 +32,8 @@ interface MapPaneProps {
   gridStepPx: number;
   /** Owned by App so it can be captured in a saved project. */
   style: MapStyle;
-  onStyleChange: (side: Side, style: MapStyle) => void;
+  /** Place names on. Both maps share this, and the base view. */
+  labels: boolean;
   /** Active shape tool for this pane. 'off' makes existing shapes read-only. */
   shapeMode: ShapeMode;
   /** Shows the per-pane search and tile-style picker. */
@@ -56,11 +56,6 @@ interface SearchResult {
   display_name: string;
   type: string;
 }
-
-const STYLE_OPTIONS = [
-  { label: 'MAP', value: 'roadmap' },
-  { label: 'SAT', value: 'satellite' },
-];
 
 /**
  * Wheel-zoom response curve.
@@ -125,7 +120,7 @@ export function MapPane({
   gridVisible,
   gridStepPx,
   style,
-  onStyleChange,
+  labels,
   shapeMode,
   showControls,
   shapes,
@@ -141,7 +136,8 @@ export function MapPane({
 }: MapPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  /** The base view and, over satellite, the labels. Swapped together. */
+  const baseLayersRef = useRef<L.Layer[]>([]);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const firstLoadDoneRef = useRef(false);
   const shapeLayerRef = useRef<ShapeLayer | null>(null);
@@ -198,6 +194,11 @@ export function MapPane({
     const corner = side === 'left' ? 'bottomleft' : 'bottomright';
     L.control.attribution({ position: corner }).addTo(map);
     L.control.scale({ position: corner, imperial: true, metric: true }).addTo(map);
+    // Labels over satellite sit above the imagery but below the shapes, and
+    // never catch clicks meant for the map or a shape.
+    const labelsPane = map.createPane(LABELS_PANE);
+    labelsPane.style.zIndex = '350';
+    labelsPane.style.pointerEvents = 'none';
     mapRef.current = map;
 
     const handleZoomEnd = () => {
@@ -228,19 +229,50 @@ export function MapPane({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
-    const tile = createTileLayer(style);
-    // Drive the loading overlay only until the first batch of tiles paints;
-    // ignoring later 'loading' events keeps it from flickering on pan/zoom.
-    tile.on('load', () => {
+    for (const l of baseLayersRef.current) map.removeLayer(l);
+    baseLayersRef.current = [];
+
+    // Drive the loading overlay only until the first view paints; ignoring
+    // later loads keeps it from flickering on pan/zoom.
+    const firstPaintDone = () => {
       if (!firstLoadDoneRef.current) {
         firstLoadDoneRef.current = true;
         setTilesLoading(false);
       }
-    });
-    tile.addTo(map);
-    tileLayerRef.current = tile;
-  }, [style]);
+    };
+    // The vector layers load asynchronously. If the view or the labels switch
+    // changes meanwhile, or the pane goes away, the late layer is dropped.
+    let stale = false;
+    const addVector = (kind: 'map' | 'labels') => {
+      createVectorLayer(kind, labels)
+        .then((layer) => {
+          if (stale || mapRef.current !== map) return;
+          layer.addTo(map);
+          baseLayersRef.current.push(layer);
+          if (kind === 'map') {
+            (layer as L.MaplibreGL).getMaplibreMap().once('idle', firstPaintDone);
+          }
+        })
+        .catch(() => {
+          // Style fetch failed (offline, or OpenFreeMap down). The map stays
+          // usable without labels; don't leave the loading veil up.
+          firstPaintDone();
+        });
+    };
+
+    if (style === 'roadmap') {
+      addVector('map');
+    } else {
+      const tile = createSatelliteLayer();
+      tile.on('load', firstPaintDone);
+      tile.addTo(map);
+      baseLayersRef.current.push(tile);
+      if (labels) addVector('labels');
+    }
+    return () => {
+      stale = true;
+    };
+  }, [style, labels]);
 
   useEffect(() => {
     const canvas = gridCanvasRef.current;
@@ -420,13 +452,6 @@ export function MapPane({
             </Combobox.Dropdown>
           </Combobox>
         </div>
-        <SegmentedControl
-          value={style}
-          onChange={(v) => onStyleChange(side, v as MapStyle)}
-          data={STYLE_OPTIONS}
-          size="sm"
-          style={{ marginLeft: 'auto' }}
-        />
       </div>
       )}
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
