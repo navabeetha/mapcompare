@@ -221,7 +221,7 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
     }
     setPinToken((t) => t + 1);
   }, [fullscreen]);
-  /** Border groups on both maps (Layers menu). Off by default. Never country borders. */
+  /** Border groups on both maps (Layers menu). Off by default. Never disputed borders. */
   const [borders, setBorders] = useState<BorderLevel[]>([]);
   const [gridStepPx, setGridStepPx] = useState(100);
   const [gridStepMeters, setGridStepMeters] = useState(100);

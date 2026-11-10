@@ -189,8 +189,9 @@ export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalP
           via <Anchor href="https://openfreemap.org">OpenFreeMap</Anchor>, and{' '}
           <Anchor href="https://nominatim.org">Nominatim</Anchor>, all open
           source. Satellite imagery is from Esri: free to use, but not open
-          data. MapCompare doesn't draw country borders. Many are disputed, and
-          it compares places rather than drawing lines between them.
+          data. Settled country borders are solid lines and disputed ones are
+          dotted, as tagged in OpenStreetMap: MapCompare shows where a border
+          is contested and takes no side.
         </Text>
 
       </Stack>

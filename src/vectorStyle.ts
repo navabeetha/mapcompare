@@ -65,23 +65,39 @@ export function withoutLabels(style: StyleSpecification): StyleSpecification {
 /**
  * Border groups in the Layers menu. OpenStreetMap's admin_level means different
  * things in different countries, so these are loose groups:
+ *   - countries: 2 (national borders), minus disputed and claimed ones
  *   - states:    3–4 (states, provinces, regions)
  *   - districts: 5–6 (districts, counties, departments)
  *   - cities:    7–8 (cities, municipalities); only where mapped, close in
  */
-export type BorderLevel = 'states' | 'districts' | 'cities';
-export const ALL_BORDER_LEVELS: BorderLevel[] = ['states', 'districts', 'cities'];
+export type BorderLevel = 'countries' | 'states' | 'districts' | 'cities';
+export const ALL_BORDER_LEVELS: BorderLevel[] = ['countries', 'states', 'districts', 'cities'];
 
 /**
- * NEVER drawn, in any view: country borders (admin_level 2), disputed lines,
- * lines one country claims, and sea borders. MapCompare takes no side on where
- * countries end. A state line that runs along a national border is stored as
- * level 2, so it isn't drawn either, and that's intended.
+ * Left out of every solid border line: disputed lines, lines one country
+ * claims, and sea borders. Disputed and claimed *land* borders between
+ * countries get their own dotted, fainter layer instead (DISPUTED_LAND, with
+ * the Countries group), so the map shows that a border is contested without
+ * drawing it as settled. Gibraltar–Spain is one: OpenStreetMap tags it
+ * disputed, claimed by GB. Sea borders are never drawn.
+ *
+ * "Disputed" is what OpenStreetMap's mappers have tagged (OpenMapTiles'
+ * `disputed` and `claimed_by`), so it's only as complete as that tagging.
+ * A state line that runs along a national border is stored once, as level 2,
+ * so it shows with the Countries group, not States.
  */
 const EXCLUDED = [
   ['==', ['typeof', ['get', 'admin_level']], 'number'],
   ['!=', ['get', 'disputed'], 1],
   ['!', ['has', 'claimed_by']],
+  ['!=', ['get', 'maritime'], 1],
+];
+
+/** Disputed or claimed land borders between countries: the dotted layer. */
+const DISPUTED_LAND = [
+  'all',
+  ['==', ['get', 'admin_level'], 2],
+  ['any', ['==', ['get', 'disputed'], 1], ['has', 'claimed_by']],
   ['!=', ['get', 'maritime'], 1],
 ];
 
@@ -95,6 +111,7 @@ interface GroupLook {
 }
 
 const GROUPS: Record<BorderLevel, GroupLook> = {
+  countries: { min: 2, max: 2, width: [1, 2.6] },
   states: { min: 3, max: 4, width: [0.8, 2] },
   districts: { min: 5, max: 6, minzoom: 5, width: [0.6, 1.4], dash: [3, 2] },
   cities: { min: 7, max: 8, minzoom: 10, width: [0.6, 1.2], dash: [1, 1.5] },
@@ -139,8 +156,42 @@ export function bordersLayers(levels: BorderLevel[], tone: 'light' | 'dark'): La
       type: 'line',
       paint: { 'line-color': t.casing, 'line-width': width(look.width, 1.5), 'line-blur': 0.5 },
     };
-    return (casing ? [casing, line] : [line]) as LayerSpecification[];
+    const layers = (casing ? [casing, line] : [line]) as LayerSpecification[];
+    return g === 'countries' ? [...layers, ...disputedLayers(tone)] : layers;
   });
+}
+
+/**
+ * Contested country borders: thinner, fainter and dotted, so they read as
+ * "disputed" next to the solid settled ones.
+ */
+function disputedLayers(tone: 'light' | 'dark'): LayerSpecification[] {
+  const t = TONES[tone];
+  const w: [number, number] = [0.7, 1.6];
+  const base = {
+    source: 'openmaptiles',
+    'source-layer': 'boundary',
+    filter: DISPUTED_LAND,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+  };
+  const line = {
+    ...base,
+    id: 'mc-border-countries-disputed',
+    type: 'line',
+    paint: {
+      'line-color': t.color,
+      'line-opacity': t.opacity * 0.7,
+      'line-width': width(w),
+      'line-dasharray': [0.5, 2.5],
+    },
+  };
+  const casing = t.casing && {
+    ...base,
+    id: 'mc-border-countries-disputed-casing',
+    type: 'line',
+    paint: { 'line-color': t.casing, 'line-width': width(w, 1.2), 'line-blur': 0.5, 'line-dasharray': [0.5, 2.5] },
+  };
+  return (casing ? [casing, line] : [line]) as LayerSpecification[];
 }
 
 export interface VectorOptions {
@@ -165,8 +216,8 @@ export function overlayStyle(style: StyleSpecification, o: VectorOptions): Style
 }
 
 /**
- * The Map view: the full style with all of its own border layers removed (so
- * no country or disputed lines, ever), our borders added under the labels, and
+ * The Map view: the full style with all of its own border layers removed (its
+ * country lines include disputed ones), our borders added under the labels, and
  * the labels removed when they're off.
  */
 export function mapViewStyle(style: StyleSpecification, o: VectorOptions): StyleSpecification {

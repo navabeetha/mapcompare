@@ -43,6 +43,7 @@ interface Props {
 }
 
 const BORDER_NAMES: Record<BorderLevel, string> = {
+  countries: 'Countries',
   states: 'States & regions',
   districts: 'Districts',
   cities: 'Cities (zoomed in)',
@@ -137,7 +138,7 @@ export function LayersMenu(p: Props) {
             checked={p.borders.length > 0}
             onChange={(e) => p.onBordersChange(e.currentTarget.checked ? ALL_BORDER_LEVELS : [])}
             label="Borders"
-            description="States, districts, cities. No country borders."
+            description="Countries, states, districts, cities. Disputed country borders are dotted."
           />
           {p.borders.length > 0 && (
             <Checkbox.Group

@@ -178,7 +178,12 @@ ideas there, not here.
   in the Layers menu. The default is satellite with labels on. A Topo view
   (OpenTopoMap) was tried and dropped as hard to read. CARTO, the old Map
   view, now needs an API key and is gone.
-- **No country borders, in any view.** This is a deliberate stand. The Borders
-  layer (`vectorStyle.ts`) draws admin levels 3–8 only, and never admin_level 2,
-  disputed, `claimed_by` or maritime lines. The Map view also strips all of
-  Liberty's own boundary layers. Tests pin this; don't relax it.
+- **Disputed borders are never drawn as settled.** A deliberate stand. The
+  Borders layer (`vectorStyle.ts`) has a Countries group (admin_level 2, added
+  2026-11-10 so a place like Gibraltar doesn't read as part of Spain) plus
+  states, districts and cities. Solid lines leave out every disputed or
+  `claimed_by` line; disputed *country* land borders get their own thinner,
+  fainter, dotted layer (Gibraltar–Spain is tagged disputed, claimed by GB).
+  Sea borders are never drawn. The Map view strips all of Liberty's own
+  boundary layers, which draw disputed lines like settled ones. "Disputed" is
+  only as complete as OpenStreetMap's tagging. Tests pin this; don't relax it.

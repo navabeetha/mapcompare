@@ -38,7 +38,7 @@ interface MapPaneProps {
   style: MapStyle;
   /** Place names on. Both maps share this, and the base view. */
   labels: boolean;
-  /** Border groups to draw. Never country borders; see vectorStyle.ts. */
+  /** Border groups to draw. Never disputed borders; see vectorStyle.ts. */
   borders: BorderLevel[];
   /** Active shape tool for this pane. 'off' makes existing shapes read-only. */
   shapeMode: ShapeMode;

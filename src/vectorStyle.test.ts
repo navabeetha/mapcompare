@@ -7,6 +7,7 @@ import {
   mapViewStyle,
   overlayStyle,
   withoutLabels,
+  type BorderLevel,
 } from './vectorStyle';
 
 // A cut-down stand-in for the OpenFreeMap "Liberty" style: one of each kind of
@@ -89,9 +90,10 @@ describe('withoutLabels: the Map view with labels switched off', () => {
 });
 
 // ---------------------------------------------------------------- borders
-// MapCompare never draws country borders (admin_level 2), disputed lines,
-// claimed lines or sea borders, in any view. That is a deliberate stand.
-
+// Country borders are drawn (since 2026-11-10, so a place like Gibraltar
+// doesn't look like part of Spain). Disputed and claimed land borders are
+// drawn too, but only in their own dotted, fainter style, so the map shows a
+// dispute rather than settling it. Sea borders are never drawn.
 /** Every filter expression in the output, flattened to one string to search. */
 const filtersOf = (layers: StyleSpecification['layers']) => layers.map((l) => JSON.stringify((l as { filter?: unknown }).filter));
 const boundaryLayers = (s: StyleSpecification) =>
@@ -108,16 +110,67 @@ describe('bordersLayers', () => {
     }
   });
 
-  it('never matches country borders, disputed, claimed or sea lines', () => {
-    for (const f of filtersOf(all)) {
-      expect(f).toContain('"disputed"');
-      expect(f).toContain('"claimed_by"');
-      expect(f).toContain('"maritime"');
-      // admin_level ranges start at 3 or higher, so level 2 never matches
-      const mins = [...f.matchAll(/">=",\["get","admin_level"\],(\d+)/g)].map((m) => Number(m[1]));
-      expect(mins.length).toBeGreaterThan(0);
-      for (const m of mins) expect(m).toBeGreaterThanOrEqual(3);
+  const isDisputedLayer = (l: StyleSpecification['layers'][number]) => l.id.includes('-disputed');
+
+  it('never draws sea borders, in any layer', () => {
+    for (const f of filtersOf(all)) expect(f).toContain('"maritime"');
+  });
+
+  it('every layer but the dotted one leaves out disputed and claimed lines', () => {
+    for (const f of filtersOf(all.filter((l) => !isDisputedLayer(l)))) {
+      expect(f).toContain('["!=",["get","disputed"],1]');
+      expect(f).toContain('["!",["has","claimed_by"]]');
     }
+  });
+
+  it('disputed land borders: country level only, dotted, thinner and fainter than settled ones', () => {
+    const countries = bordersLayers(['countries'], 'light');
+    const disputed = countries.filter(isDisputedLayer);
+    const settled = countries.find((l) => l.id === 'mc-border-countries')!;
+    expect(disputed.length).toBeGreaterThan(0);
+    for (const l of disputed) {
+      const f = JSON.stringify((l as { filter?: unknown }).filter);
+      expect(f).toContain('["==",["get","admin_level"],2]');
+      expect(f).toMatch(/"any",\["==",\["get","disputed"\],1\],\["has","claimed_by"\]/);
+      expect(f).toContain('["!=",["get","maritime"],1]');
+    }
+    const line = disputed.find((l) => !l.id.endsWith('-casing'))!;
+    const paint = line.paint as Record<string, unknown>;
+    const settledPaint = settled.paint as Record<string, unknown>;
+    expect(paint['line-dasharray']).toBeDefined();
+    const at12 = (w: unknown) => (w as number[])[(w as number[]).length - 1];
+    expect(at12(paint['line-width'])).toBeLessThan(at12(settledPaint['line-width']));
+    expect(paint['line-opacity'] as number).toBeLessThan(settledPaint['line-opacity'] as number);
+  });
+
+  it('no disputed layer unless Countries is on', () => {
+    expect(bordersLayers(['states', 'districts', 'cities'], 'light').filter(isDisputedLayer)).toEqual([]);
+  });
+
+  it('only the Countries group reaches admin level 2', () => {
+    const minsOf = (levels: BorderLevel[]) =>
+      filtersOf(bordersLayers(levels, 'light')).flatMap((f) =>
+        [...f.matchAll(/">=",\["get","admin_level"\],(\d+)/g)].map((m) => Number(m[1]))
+      );
+    expect(minsOf(['countries'])).toContain(2);
+    for (const m of minsOf(['states', 'districts', 'cities'])) expect(m).toBeGreaterThanOrEqual(3);
+  });
+
+  it('countries are admin level 2 only, drawn bolder than states', () => {
+    const f = filtersOf(bordersLayers(['countries'], 'light')).join();
+    expect(f).toMatch(/">=",\["get","admin_level"\],2\].*"<=",\["get","admin_level"\],2\]/);
+    const widthAt12 = (g: BorderLevel) => {
+      const line = bordersLayers([g], 'dark')[0];
+      const w = (line.paint as Record<string, unknown>)['line-width'] as unknown[];
+      return w[w.length - 1] as number;
+    };
+    expect(widthAt12('countries')).toBeGreaterThan(widthAt12('states'));
+  });
+
+  it('the Map view still drops Liberty’s own border layers, so its disputed lines never show', () => {
+    const out = mapViewStyle(STYLE, { labels: true, borders: ['countries'] });
+    const own = boundaryLayers(out).filter((l) => !l.id.startsWith('mc-border-'));
+    expect(own).toEqual([]);
   });
 
   it('picks the admin levels of each group', () => {
