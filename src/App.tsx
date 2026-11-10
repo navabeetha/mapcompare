@@ -66,7 +66,7 @@ import {
 import comparisonsJson from './data/comparisons.json';
 import logoUrl from './assets/mapcompare-logo.svg';
 import type { AppMode } from './mode';
-import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
+import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, searchTarget, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
 import { renderComparison } from './exportImage';
 import { ShareModal } from './ShareModal';
@@ -157,6 +157,9 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
   const [leftQuery, setLeftQuery] = useState('');
   const [rightQuery, setRightQuery] = useState('');
   const [splitPct, setSplitPct] = useState(50);
+  // For callbacks that must stay stable (handleSearchCity) but need the split.
+  const splitPctRef = useRef(splitPct);
+  splitPctRef.current = splitPct;
   // Bumped to force the relayout effect to run even when splitPct itself is
   // unchanged — loading a view whose split happens to match the current one
   // would otherwise be a no-op state update and never apply its anchor.
@@ -507,7 +510,16 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
         : // No opposite pane yet (first paint): hold this pane's own zoom.
           self?.getZoom() ?? city.zoom;
 
-      applyView(side, [city.lat, city.lng], zoom);
+      // Land the place in the middle of this map's visible part, not at the
+      // map's own centre (which is the split bar).
+      if (self) {
+        const size = self.getSize();
+        const target = searchTarget(side, splitPctRef.current, size.x, size.y);
+        const c = centreForPin(self.project([city.lat, city.lng], zoom), target, size);
+        applyView(side, self.unproject(L.point(c.x, c.y), zoom), zoom);
+      } else {
+        applyView(side, [city.lat, city.lng], zoom);
+      }
     },
     [applyView]
   );

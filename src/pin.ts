@@ -69,3 +69,17 @@ export function centreForPin(
 ): { x: number; y: number } {
   return { x: pinned.x - target.x + size.x / 2, y: pinned.y - target.y + size.y / 2 };
 }
+
+/**
+ * Where a searched place lands: the middle of that map's visible part. The
+ * maps are full-screen behind a curtain, so the map's own centre is the split
+ * bar, right at the edge of what you can see.
+ */
+export function searchTarget(
+  side: 'left' | 'right',
+  splitPct: number,
+  width: number,
+  height: number
+): { x: number; y: number } {
+  return pinPoint(CENTRE_PIN, visibleFrame(side, splitPct, width, height));
+}

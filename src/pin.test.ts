@@ -53,3 +53,15 @@ describe('isCentrePin', () => {
     expect(isCentrePin(undefined)).toBe(true);
   });
 });
+
+import { searchTarget } from './pin';
+
+describe('searchTarget: where a searched place lands on screen', () => {
+  // A 1000 × 800 screen split at 40%: the left map shows 0–400, the right 400–1000.
+  it('the middle of the left map’s visible part, not the split', () => {
+    expect(searchTarget('left', 40, 1000, 800)).toEqual({ x: 200, y: 400 });
+  });
+  it('the middle of the right map’s visible part', () => {
+    expect(searchTarget('right', 40, 1000, 800)).toEqual({ x: 700, y: 400 });
+  });
+});
