@@ -17,10 +17,10 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   LuCheck,
+  LuChevronDown,
   LuCopy,
+  LuDownload,
   LuEye,
-  LuGlobe,
-  LuGlobeLock,
   LuGripVertical,
   LuPencil,
   LuRefreshCw,
@@ -56,8 +56,8 @@ import {
  * touch this browser. Changes can be lined up before connecting GitHub; only
  * "Publish changes" needs the token.
  *
- * Layout: drafts on the left, Explore on the right. A draft's globe icon adds
- * it to Explore; an Explore row's globe-lock icon takes it back to drafts.
+ * Layout: drafts on the left, Explore on the right. A draft's upload icon adds
+ * it to Explore; an Explore row's download icon takes it back to drafts.
  * Explore rows reorder by drag and drop (native HTML5, no library), or with
  * the arrow keys on the grip. The fixed footer has the GitHub connection, a
  * Copy-as-JSON menu, Discard and Publish.
@@ -304,7 +304,7 @@ export function ManageExploreModal(p: Props) {
                         {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'draft', value: item.title }))}
                         {icon(
                           publishedIds.has(item.id) ? 'Update the copy in Explore' : 'Add to Explore',
-                          publishedIds.has(item.id) ? LuRefreshCw : LuGlobe,
+                          publishedIds.has(item.id) ? LuRefreshCw : LuUpload,
                           () => setWorking((w) => publishItem(w, item)),
                           saving,
                         )}
@@ -392,7 +392,7 @@ export function ManageExploreModal(p: Props) {
                           {icon('Rename', LuPencil, () => setRenaming({ id: item.id, where: 'pub', value: item.title }), saving)}
                           {icon(
                             'Take out of Explore and back to drafts',
-                            LuGlobeLock,
+                            LuDownload,
                             () => {
                               if (!p.drafts.some((d) => d.id === item.id)) p.onDraftsChange([item, ...p.drafts]);
                               setWorking((w) => removeItem(w, item.id));
@@ -414,17 +414,32 @@ export function ManageExploreModal(p: Props) {
         <Group className="fixed-modal-footer" justify="space-between" wrap="nowrap" align="center">
           {token ? (
             <Group gap={8} wrap="nowrap">
-              <Badge size="sm" color={remote ? 'green' : 'gray'} variant="dot">
-                {remote ? 'GitHub connected' : loading ? 'Connecting…' : 'Not connected'}
-              </Badge>
-              <Button size="compact-xs" variant="subtle" color="gray" onClick={() => token && load(token)} loading={loading}>
-                Reload
-              </Button>
-              <Tooltip label="Removes the token from this browser. Paste a new one to reconnect." withArrow>
-                <Button size="compact-xs" variant="subtle" color="red" onClick={forget}>
-                  Forget token
-                </Button>
-              </Tooltip>
+              {/* The status doubles as the menu for the connection. */}
+              <Menu position="top-start" withArrow shadow="md">
+                <Menu.Target>
+                  <Badge
+                    component="button"
+                    type="button"
+                    size="sm"
+                    color={remote ? 'green' : 'gray'}
+                    variant="dot"
+                    rightSection={<LuChevronDown size={10} />}
+                    style={{ cursor: 'pointer' }}
+                    aria-label="GitHub connection options"
+                  >
+                    {remote ? 'GitHub connected' : loading ? 'Connecting…' : 'Not connected'}
+                  </Badge>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<LuRefreshCw size={14} />} onClick={() => token && load(token)} disabled={loading}>
+                    Reload from GitHub
+                  </Menu.Item>
+                  <Menu.Item leftSection={<LuX size={14} />} color="red" onClick={forget}>
+                    Forget token
+                  </Menu.Item>
+                  <Menu.Label>Paste a new token to reconnect after forgetting.</Menu.Label>
+                </Menu.Dropdown>
+              </Menu>
             </Group>
           ) : (
             <Group gap={6} wrap="nowrap" style={{ flex: 1, maxWidth: 520 }}>
