@@ -1,19 +1,8 @@
 import { metersPerPixel } from './altitude';
+import { gridIsDrawable, niceNumber } from './gridUnits';
 
 const TARGET_PX_SPACING = 100;
 const CHECKER_ALPHA = 0.1;
-
-export function niceNumber(value: number): number {
-  if (value <= 0) return 1;
-  const exp = Math.floor(Math.log10(value));
-  const fraction = value / Math.pow(10, exp);
-  let nice: number;
-  if (fraction < 1.5) nice = 1;
-  else if (fraction < 3.5) nice = 2;
-  else if (fraction < 7.5) nice = 5;
-  else nice = 10;
-  return nice * Math.pow(10, exp);
-}
 
 /**
  * Single source of truth for the on-screen grid cell size. Computed once
@@ -58,7 +47,9 @@ export function drawScaleGrid(canvas: HTMLCanvasElement, stepPx: number): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-  if (!isFinite(stepPx) || stepPx <= 0) return;
+  // Too fine to see: draw nothing rather than millions of sub-pixel cells
+  // (a 5 m grid while zoomed out froze the page).
+  if (!gridIsDrawable(stepPx)) return;
 
   const cx = cssWidth / 2;
   const cy = cssHeight / 2;

@@ -1001,6 +1001,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 gridStepMeters={gridStepMeters}
                 gridOverrideMeters={gridOverrideMeters}
                 onGridOverride={applyGridOverride}
+                metersPerPixel={scaleMpp}
                 labelsVisible={labelsVisible}
                 onLabelsVisibleChange={setLabelsVisible}
                 mapStyle={mapStyle}

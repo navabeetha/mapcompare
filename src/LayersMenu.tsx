@@ -15,6 +15,7 @@ import {
 } from '@mantine/core';
 import { MdLayers } from 'react-icons/md';
 import { formatDistance } from './altitude';
+import { formatImperial, gridIsDrawable, gridSystemOf, gridUnitFor, toMeters, validateCell, type GridSystem } from './gridUnits';
 import { STYLE_LABELS, type MapStyle } from './tileLayers';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
@@ -26,6 +27,8 @@ interface Props {
   gridOverrideMeters: number | null;
   /** null goes back to auto. */
   onGridOverride: (meters: number | null) => void;
+  /** Metres per pixel now (the grid's reference map), for units and limits. */
+  metersPerPixel: number;
   labelsVisible: boolean;
   onLabelsVisibleChange: (on: boolean) => void;
   /** Base view, shared by both maps. */
@@ -59,13 +62,23 @@ const ROW = {
 export function LayersMenu(p: Props) {
   const [opened, setOpened] = useState(false);
   const [gridInput, setGridInput] = useState<number | string>('');
-  const [gridUnit, setGridUnit] = useState<'m' | 'km'>('km');
+  // km or mi; the small unit (m, ft) follows the zoom (gridUnits.ts).
+  const [gridSystem, setGridSystem] = useState<GridSystem>('metric');
+  const gridUnit = gridUnitFor(gridSystem, p.metersPerPixel);
+  const gridError = gridInput === '' ? null : validateCell(Number(gridInput), gridUnit, p.metersPerPixel);
+  const fixed = p.gridOverrideMeters;
+  const cellText =
+    fixed != null && gridSystemOf(fixed) === 'imperial' ? formatImperial(fixed) : formatDistance(p.gridStepMeters);
+  const hiddenNow = !gridIsDrawable(p.gridStepMeters / p.metersPerPixel);
 
   // Fill the length box from the current grid each time the menu opens.
   function toggle() {
     if (!opened) {
-      setGridInput(p.gridStepMeters >= 1000 ? +(p.gridStepMeters / 1000).toFixed(2) : Math.round(p.gridStepMeters));
-      setGridUnit(p.gridStepMeters >= 1000 ? 'km' : 'm');
+      // In the system the grid was set in, and the unit that suits this zoom.
+      const system = gridSystemOf(p.gridStepMeters);
+      const unit = gridUnitFor(system, p.metersPerPixel);
+      setGridSystem(system);
+      setGridInput(+(p.gridStepMeters / toMeters(1, unit)).toPrecision(3));
     }
     setOpened((o) => !o);
   }
@@ -147,31 +160,48 @@ export function LayersMenu(p: Props) {
             checked={p.gridVisible}
             onChange={(e) => p.onGridVisibleChange(e.currentTarget.checked)}
             label="Scale grid"
-            description={`Cells ${formatDistance(p.gridStepMeters)}${p.gridOverrideMeters != null ? ' (fixed)' : ' (auto)'}`}
+            description={`Cells ${cellText}${fixed != null ? ' (fixed)' : ' (auto)'}${
+              hiddenNow ? ': too small to show at this zoom' : ''
+            }`}
           />
           {p.gridVisible && (
             <>
               <Group gap="xs" align="flex-end" wrap="nowrap">
-                <NumberInput label="Cell length" size="xs" min={0} w={110} value={gridInput} onChange={setGridInput} />
+                <NumberInput
+                  label="Cell length"
+                  size="xs"
+                  min={0}
+                  w={110}
+                  value={gridInput}
+                  onChange={setGridInput}
+                />
+                {/* Labels follow the zoom: m or km, ft or mi. */}
                 <SegmentedControl
                   size="xs"
-                  value={gridUnit}
-                  onChange={(v) => setGridUnit(v as 'm' | 'km')}
+                  value={gridSystem}
+                  onChange={(v) => setGridSystem(v as GridSystem)}
                   data={[
-                    { label: 'm', value: 'm' },
-                    { label: 'km', value: 'km' },
+                    { label: gridUnitFor('metric', p.metersPerPixel), value: 'metric' },
+                    { label: gridUnitFor('imperial', p.metersPerPixel), value: 'imperial' },
                   ]}
+                  aria-label="Unit"
                 />
               </Group>
+              {gridError && (
+                <Text size="xs" c="red">
+                  {gridError}
+                </Text>
+              )}
               <Group gap="xs" justify="space-between">
                 <Button variant="subtle" size="xs" onClick={() => p.onGridOverride(null)}>
                   Reset to auto
                 </Button>
                 <Button
                   size="xs"
+                  disabled={gridInput === '' || !!gridError}
                   onClick={() => {
-                    const meters = Number(gridInput) * (gridUnit === 'km' ? 1000 : 1);
-                    if (meters > 0) p.onGridOverride(meters);
+                    if (gridInput === '' || gridError) return;
+                    p.onGridOverride(toMeters(Number(gridInput), gridUnit));
                   }}
                 >
                   Set

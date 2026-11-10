@@ -76,7 +76,13 @@ grid's cell length (`scaleBar.ts`, `ScaleControl.ts`; Leaflet's own scale
 control is not used). The distance comes from the grid's reference (the
 left map); each map draws it at its own metres per pixel, so bar lengths stay
 true. A fixed grid length the author set is used while it gives a readable
-bar (40–240 px), otherwise the automatic one.
+bar (40–240 px), otherwise the automatic one. A grid set in mi/ft lines up
+with the imperial bar instead (`gridSystemOf`).
+
+**Grid cells under 8 px are never drawn** (`gridIsDrawable`): a 5 m grid while
+zoomed out meant millions of sub-pixel squares per frame and froze the page.
+The Layers menu's unit toggle is km/mi, with m/ft shown when the zoom suits,
+and it refuses lengths too small to see at the current zoom.
 
 ## Schema
 

@@ -8,7 +8,7 @@
  * map); each map then draws it at its own scale (barWidthPx), so the bar
  * lengths stay true even if the two scales differ slightly.
  */
-import { niceNumber } from './GridLayer';
+import { FOOT, formatImperial, gridSystemOf, MILE, niceNumber } from './gridUnits';
 
 export interface ScaleStep {
   meters: number;
@@ -25,8 +25,6 @@ const MIN_PX = 40;
 const MAX_PX = 240;
 /** Same target as the grid's automatic cell size. */
 const TARGET_PX = 100;
-const FOOT = 0.3048;
-const MILE = 1609.344;
 
 export function formatMetric(meters: number): string {
   return meters >= 1000 ? `${+(meters / 1000).toFixed(3)} km` : `${+meters.toFixed(3)} m`;
@@ -39,11 +37,15 @@ export function formatMetric(meters: number): string {
 export function harmonizedScale({ mpp, gridStepMeters }: { mpp: number; gridStepMeters: number }): HarmonizedScale {
   const auto = niceNumber(mpp * TARGET_PX);
   const gridPx = gridStepMeters / mpp;
-  const meters = gridPx >= MIN_PX && gridPx <= MAX_PX ? gridStepMeters : auto;
+  const readable = gridPx >= MIN_PX && gridPx <= MAX_PX;
+  // A grid set in mi or ft lines up with the imperial bar; otherwise the km bar.
+  const imperialGrid = readable && gridSystemOf(gridStepMeters) === 'imperial';
+  const meters = readable && !imperialGrid ? gridStepMeters : auto;
 
   const feet = (mpp * TARGET_PX) / FOOT;
-  const imperial: ScaleStep =
-    feet > 5280
+  const imperial: ScaleStep = imperialGrid
+    ? { meters: gridStepMeters, label: formatImperial(gridStepMeters) }
+    : feet > 5280
       ? (() => {
           const mi = niceNumber(feet / 5280);
           return { meters: mi * MILE, label: `${mi} mi` };
