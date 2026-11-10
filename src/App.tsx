@@ -979,19 +979,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
               <img src={logoUrl} alt="" width={22} height={22} className="brand-logo" />
               <Title order={4}>MapCompare</Title>
             </Group>
-            {/* View mode leads with the title of the comparison that's open. */}
-            {!isAuthor && openProject && (
-              <Group gap={8} wrap="nowrap" align="baseline" ml={32}>
-                <Text fw={600} size="sm">
-                  {displayTitle(openProject.title)}
-                </Text>
-                {openProject.description && (
-                  <Text size="xs" c="dimmed" lineClamp={1}>
-                    {openProject.description}
-                  </Text>
-                )}
-              </Group>
-            )}
             <Group gap="sm" wrap="nowrap" align="center" ml={56}>
               <ExploreMenu
                 isAuthor={isAuthor}
