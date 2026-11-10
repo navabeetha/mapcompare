@@ -94,12 +94,18 @@
   {
     "schemaVersion": 2,
     "id": "0c24fe2d-e752-424e-8404-120345bdbc36",
-    "title": "tokyo bay vs paris",
+    "title": "Tokyo Bay vs Paris",
     "splitPct": 50,
     "grid": {
-      "visible": false,
+      "visible": true,
       "overrideMeters": null
     },
+    "labels": true,
+    "borders": [
+      "states",
+      "districts",
+      "cities"
+    ],
     "left": {
       "city": {
         "name": "Tokyo",
@@ -111,11 +117,23 @@
         "population": 0,
         "curio": "Tokyo, Japan"
       },
-      "lat": 35.608932774169475,
-      "lng": 139.89547033912626,
-      "zoom": 11.5,
+      "lat": 35.58451768378969,
+      "lng": 140.1115302248709,
+      "zoom": 11.291987411785085,
       "style": "satellite",
-      "shapes": []
+      "shapes": [
+        {
+          "id": "9a20b20d-6c71-4290-8dbb-81bf768b597c",
+          "kind": "circle",
+          "points": [
+            [
+              35.577219685691404,
+              139.9786121752975
+            ]
+          ],
+          "radiusM": 6778.718478851474
+        }
+      ]
     },
     "right": {
       "city": {
@@ -128,11 +146,23 @@
         "population": 0,
         "curio": "Paris, Ile-de-France, Metropolitan France, France"
       },
-      "lat": 48.876443297563554,
-      "lng": 2.3283506628732824,
-      "zoom": 11.25,
+      "lat": 48.86059767230978,
+      "lng": 2.067038343794492,
+      "zoom": 10.985512524868257,
       "style": "satellite",
-      "shapes": []
+      "shapes": [
+        {
+          "id": "0bd93d66-4637-45c9-bfc1-36d0118aa1ed",
+          "kind": "circle",
+          "points": [
+            [
+              48.86059767230978,
+              2.340307093370515
+            ]
+          ],
+          "radiusM": 6778.718478851474
+        }
+      ]
     },
     "createdAt": 1779819044085
   },
