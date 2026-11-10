@@ -302,7 +302,7 @@ html, body, #root {
   background: var(--mantine-color-default-hover);
 }
 
-/* Modals with a fixed title bar and footer and a scrolling middle (Welcome, Manage Explore). */
+/* Modals with a fixed title bar (and footer, if any) and a scrolling middle (Welcome, Manage Explore, Share). */
 /* Modal.Content puts its className on Mantine's outer wrapper, so the box
    itself is the .mantine-Modal-content inside it. */
 .fixed-modal .mantine-Modal-content {

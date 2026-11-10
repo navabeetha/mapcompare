@@ -124,16 +124,18 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
   }
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={<Text fw={700}>Share</Text>}
-      size={880}
-      centered
-      // The header stays put while the body scrolls (Mantine's sticky
-      // header); the line makes that edge visible on short windows.
-      styles={{ header: { borderBottom: '1px solid var(--mantine-color-dark-4)', marginBottom: 'var(--mantine-spacing-sm)' } }}
-    >
+    // Fixed title bar, scrolling middle: the same pattern as Welcome and
+    // Manage Explore (.fixed-modal in styles.css).
+    <Modal.Root opened={opened} onClose={onClose} size={880} centered>
+      <Modal.Overlay />
+      <Modal.Content className="fixed-modal">
+        <Modal.Header>
+          <Modal.Title>
+            <Text fw={700}>Share</Text>
+          </Modal.Title>
+          <Modal.CloseButton />
+        </Modal.Header>
+        <Modal.Body className="fixed-modal-body">
       <Stack gap="sm">
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
           Image
@@ -240,6 +242,8 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
                 : 'Opens exactly what’s on screen: both maps, the split, layers and shapes.'}
         </Text>
       </Stack>
-    </Modal>
+        </Modal.Body>
+      </Modal.Content>
+    </Modal.Root>
   );
 }
