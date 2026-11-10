@@ -69,6 +69,13 @@ Run before every push. `npm run check` covers the automated part.
   trips through React (`mutate → onChange → setShapes`), and rebuilding handles
   there would delete the marker Leaflet is dragging.
 
+## Logo
+
+The official logo is `src/assets/mapcompare-logo.svg` (white artwork, for the
+dark UI): header, Welcome modal and the Share image footer. The tab icon is
+`public/favicon.svg`, the same shapes on the app's blue (#228be6) so it shows
+on light and dark tab bars; regenerate it from the logo if the logo changes.
+
 ## Scale bars
 
 Both maps show the **same round distances**, and the km bar equals the scale

@@ -22,6 +22,7 @@
  */
 import L from 'leaflet';
 import { LABELS_PANE } from './tileLayers';
+import logoUrl from './assets/mapcompare-logo.svg';
 import {
   exportFileName,
   fitPixelRatio,
@@ -34,6 +35,9 @@ import {
 } from './exportLayout';
 
 type Side = 'left' | 'right';
+
+const BRAND = 'MapCompare';
+const LOGO_PX = 14;
 
 export interface ExportInput {
   /** The element holding both maps (.split-container). */
@@ -78,6 +82,8 @@ export async function renderComparison(input: ExportInput): Promise<RenderedImag
 
   const fonts: Record<FooterFont, string> = {
     city: `600 12px ${family}`,
+    brand: `700 12px ${family}`,
+    site: `400 11px ${family}`,
     credits: `400 11px ${family}`,
   };
   const measure = (s: string, f: FooterFont) => {
@@ -87,7 +93,8 @@ export async function renderComparison(input: ExportInput): Promise<RenderedImag
   const credits = mergeCredits(
     [...container.querySelectorAll('.leaflet-control-attribution')].map((e) => e.textContent ?? ''),
   );
-  const footer = layoutFooter({ width: W, site: SITE, credits }, measure);
+  const footer = layoutFooter({ width: W, brand: BRAND, site: SITE, logo: LOGO_PX, credits }, measure);
+  const logo = await loadImage(logoUrl);
 
   const ratio = fitPixelRatio(W, H + footer.height, window.devicePixelRatio || 1);
   canvas.width = Math.round(W * ratio);
@@ -115,7 +122,7 @@ export async function renderComparison(input: ExportInput): Promise<RenderedImag
     ctx.fillRect(at - 1, 0, 2, H);
   }
 
-  drawFooter(ctx, footer, { W, H, family, fonts, container, cities });
+  drawFooter(ctx, footer, { W, H, family, fonts, container, cities, logo });
 
   let blob: Blob | null;
   try {
@@ -302,11 +309,12 @@ function drawFooter(
     H: number;
     family: string;
     fonts: Record<FooterFont, string>;
+    logo: HTMLImageElement | null;
     container: HTMLElement;
     cities: Record<Side, { name: string; country: string }>;
   },
 ): void {
-  const { W, H, fonts, container, cities, family } = o;
+  const { W, H, fonts, container, cities, family, logo } = o;
   ctx.fillStyle = C.border;
   ctx.fillRect(0, H, W, 1);
 
@@ -320,22 +328,42 @@ function drawFooter(
     drawScaleBars(ctx, lines, cities[side], side, side === 'left' ? f.pad : W - f.pad, top, family);
   }
 
-  // Row 2: "site | credits", wrapped by layoutFooter. The credits are required
-  // and never cut. The site address is a shade brighter than the credits.
-  let y = top + f.scaleH + 6 + 11;
+  // Row 2, left: the logo, "MapCompare" and the site address.
+  const y = top + f.scaleH + 6 + 11;
+  let x = f.pad;
+  if (logo) ctx.drawImage(logo, x, y - 11, f.logo, f.logo);
+  x += f.logo + 6;
+  ctx.font = fonts.brand;
+  ctx.fillStyle = C.text;
+  ctx.fillText(BRAND, x, y);
+  x += ctx.measureText(BRAND).width + 8;
+  ctx.font = fonts.site;
+  ctx.fillStyle = C.scale;
+  ctx.fillText(SITE, x, y);
+
+  // Right: the map credits, right-aligned; beside the brand, or below it on a
+  // narrow image. Required, never cut (layoutFooter wraps them).
   ctx.font = fonts.credits;
-  f.lines.forEach((line, i) => {
-    let x = f.pad;
-    if (i === 0 && line.startsWith(SITE)) {
-      ctx.fillStyle = C.scale;
-      ctx.fillText(SITE, x, y);
-      x += ctx.measureText(SITE).width;
-      line = line.slice(SITE.length);
-    }
-    ctx.fillStyle = C.dim;
-    ctx.fillText(line, x, y);
-    y += f.lineH;
-  });
+  ctx.fillStyle = C.dim;
+  ctx.textAlign = 'right';
+  let cy = f.creditsBeside ? y : y + f.lineH;
+  for (const line of f.creditLines) {
+    ctx.fillText(line, W - f.pad, cy);
+    cy += f.lineH;
+  }
+  ctx.textAlign = 'left';
+}
+
+/** The logo for the footer; null (no logo) rather than failing the export. */
+async function loadImage(src: string): Promise<HTMLImageElement | null> {
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    return img;
+  } catch {
+    return null;
+  }
 }
 
 /** Leaflet-style stacked bars (metric on top, imperial below), labelled with city and country. */

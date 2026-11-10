@@ -6,7 +6,8 @@
  *
  *   ┌────────────────────────────────────────────────────────────┐
  *   │ Tokyo  [3 km |1 mi]                    [2 km |1 mi]  Paris │
- *   │ navabeetha.github.io/mapcompare | Leaflet | Tiles © Esri … │
+ *   │ Japan                                               France │
+ *   │ ◐ MapCompare  navabeetha.github.io/…   Leaflet | Tiles © … │
  *   └────────────────────────────────────────────────────────────┘
  *
  * No title row: the city names by the scale bars already say it. The
@@ -92,27 +93,45 @@ export function wrapText(text: string, maxWidth: number, measure: (s: string) =>
   return lines;
 }
 
-export type FooterFont = 'city' | 'credits';
+export type FooterFont = 'city' | 'brand' | 'site' | 'credits';
 
 export interface FooterLayout {
   pad: number;
+  gap: number;
   scaleH: number;
-  /** "site | credits", wrapped. */
-  lines: string[];
+  /** Logo, "MapCompare" and the site address, on the left of the bottom row. */
+  logo: number;
+  brandWidth: number;
+  /** Map credits: beside the brand (right-aligned in their column) or below it. */
+  creditsBeside: boolean;
+  creditWidth: number;
+  creditLines: string[];
   lineH: number;
   height: number;
 }
 
+/** Narrower than this, a credits column beside the brand reads badly: go below. */
+const MIN_CREDIT_COLUMN = 160;
+
 export function layoutFooter(
-  f: { width: number; site: string; credits: string },
+  f: { width: number; brand: string; site: string; logo: number; credits: string },
   measure: (s: string, font: FooterFont) => number,
 ): FooterLayout {
   const pad = 14;
+  const gap = 24;
   const scaleH = 30;
   const lineH = 15;
-  const lines = wrapText(`${f.site} | ${f.credits}`, f.width - 2 * pad, (s) => measure(s, 'credits'));
-  const height = pad + scaleH + 6 + lines.length * lineH + pad - 4;
-  return { pad, scaleH, lines, lineH, height };
+  const inner = f.width - 2 * pad;
+  const brandWidth = f.logo + 6 + measure(f.brand, 'brand') + 8 + measure(f.site, 'site');
+
+  const column = inner - brandWidth - gap;
+  const creditsBeside = column >= MIN_CREDIT_COLUMN;
+  const creditWidth = creditsBeside ? column : inner;
+  const creditLines = wrapText(f.credits, creditWidth, (s) => measure(s, 'credits'));
+
+  const rows = creditsBeside ? Math.max(1, creditLines.length) : 1 + creditLines.length;
+  const height = pad + scaleH + 6 + rows * lineH + pad - 4;
+  return { pad, gap, scaleH, logo: f.logo, brandWidth, creditsBeside, creditWidth, creditLines, lineH, height };
 }
 
 /** "PNG · 3024 × 1754 px · 1.2 MB", shown under the Share preview. */

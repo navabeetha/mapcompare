@@ -63,6 +63,7 @@ import {
   type Project,
 } from './projects';
 import comparisonsJson from './data/comparisons.json';
+import logoUrl from './assets/mapcompare-logo.svg';
 import type { AppMode } from './mode';
 import { CENTRE_PIN, centreForPin, isCentrePin, pinPoint, visibleFrame, type Pin } from './pin';
 import { toMapStyle, type MapStyle } from './tileLayers';
@@ -974,7 +975,10 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
-            <Title order={4}>MapCompare</Title>
+            <Group gap={8} wrap="nowrap">
+              <img src={logoUrl} alt="" width={22} height={22} className="brand-logo" />
+              <Title order={4}>MapCompare</Title>
+            </Group>
             {/* View mode leads with the title of the comparison that's open. */}
             {!isAuthor && openProject && (
               <Group gap={8} wrap="nowrap" align="baseline" ml={32}>

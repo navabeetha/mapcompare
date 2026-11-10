@@ -12,6 +12,7 @@ import {
   SimpleGrid,
   UnstyledButton,
 } from '@mantine/core';
+import logoUrl from './assets/mapcompare-logo.svg';
 import { displayTitle, type Project } from './projects';
 
 /** How many featured comparisons the Welcome box offers. */
@@ -39,9 +40,12 @@ export function AboutModal({ opened, onClose, comparisons, onPick }: AboutModalP
       <Modal.Content className="fixed-modal">
         <Modal.Header>
           <Modal.Title>
-            <Text fw={700} fz="h3">
-              Welcome to MapCompare
-            </Text>
+            <Group gap={10} wrap="nowrap">
+              <img src={logoUrl} alt="" width={28} height={28} className="brand-logo" />
+              <Text fw={700} fz="h3">
+                Welcome to MapCompare
+              </Text>
+            </Group>
           </Modal.Title>
           <Modal.CloseButton />
         </Modal.Header>

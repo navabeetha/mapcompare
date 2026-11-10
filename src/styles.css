@@ -430,3 +430,9 @@ html, body, #root {
   max-height: 60vh;
   object-fit: contain;
 }
+
+/* The MapCompare logo (white artwork, src/assets/mapcompare-logo.svg). */
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+}

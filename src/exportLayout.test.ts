@@ -93,21 +93,36 @@ describe('wrapText', () => {
   });
 });
 
-describe('layoutFooter: scale row, then "site | credits"', () => {
-  const base = { site: 'navabeetha.github.io/mapcompare', credits: 'Leaflet | Tiles © Esri' };
-  it('puts the site first, then " | ", then the credits', () => {
+describe('layoutFooter: scale row, then [logo] MapCompare + link on the left, credits on the right', () => {
+  const base = { brand: 'MapCompare', site: 'navabeetha.github.io/mapcompare', logo: 14, credits: 'Leaflet | Tiles © Esri' };
+  // With the fake 10 px-per-character measure: brand block = 14 + 6 + 100 + 8 + 310 = 438 px.
+
+  it('wide: the credits sit on the brand row, at the right', () => {
     const f = layoutFooter({ ...base, width: 2000 }, measure);
-    expect(f.lines).toEqual(['navabeetha.github.io/mapcompare | Leaflet | Tiles © Esri']);
+    expect(f.creditsBeside).toBe(true);
+    expect(f.creditLines).toEqual(['Leaflet | Tiles © Esri']);
   });
-  it('never drops the credits: they wrap on a narrow image', () => {
-    const credits = 'Leaflet | Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics';
-    const f = layoutFooter({ ...base, width: 400, credits }, measure);
-    expect(f.lines.length).toBeGreaterThan(1);
-    expect(f.lines.join(' ')).toBe(`${base.site} | ${credits}`);
+
+  it('medium: long credits wrap within the right-hand column, never over the brand', () => {
+    const credits = 'Leaflet | Tiles © Esri — Sources: Esri, Maxar, Earthstar Geographics, OpenFreeMap © OpenStreetMap contributors';
+    const f = layoutFooter({ ...base, width: 1000, credits }, measure);
+    expect(f.creditsBeside).toBe(true);
+    expect(f.creditLines.length).toBeGreaterThan(1);
+    expect(f.creditLines.every((l) => measure(l) <= f.creditWidth)).toBe(true);
+    expect(f.brandWidth + f.gap + f.creditWidth).toBeLessThanOrEqual(1000 - 2 * f.pad);
+    expect(f.creditLines.join(' ')).toBe(credits);
   });
-  it('grows taller as the bottom row wraps', () => {
+
+  it('narrow: the credits move below the brand row and use the full width', () => {
+    const credits = 'Leaflet | Tiles © Esri — Sources: Esri, Maxar';
+    const f = layoutFooter({ ...base, width: 560, credits }, measure);
+    expect(f.creditsBeside).toBe(false);
+    expect(f.creditLines.join(' ')).toBe(credits);
+  });
+
+  it('grows taller as the credits need more lines', () => {
     const one = layoutFooter({ ...base, width: 2000 }, measure);
-    const many = layoutFooter({ ...base, width: 200 }, measure);
+    const many = layoutFooter({ ...base, width: 400, credits: 'a b c d e f g h i j k l m n o p q r s t u v w x y z '.repeat(4) }, measure);
     expect(many.height).toBeGreaterThan(one.height);
   });
 });
