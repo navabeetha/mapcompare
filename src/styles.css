@@ -258,15 +258,15 @@ html, body, #root {
 }
 
 /* "Hide map controls" (header button): a clean view of the two maps. Hides
-   the per-map search, the city cards, the zoom buttons, the scale bars and
-   the shape sizes and ratio panel, and the drawing hint. The map credits (.leaflet-control-
+   the per-map search, the city cards, the zoom buttons, the shape sizes and
+   ratio panel, and the drawing hint. The scale bars stay (they're part of the
+   comparison), and so do the map credits (.leaflet-control-
    attribution) must STAY: the OpenStreetMap licence (ODbL) and Esri's terms
    require visible attribution wherever their maps are shown. Don't add them
    here. */
 .split-container[data-map-ui-hidden] .pane-toolbar,
 .split-container[data-map-ui-hidden] .data-card,
 .split-container[data-map-ui-hidden] .leaflet-control-zoom,
-.split-container[data-map-ui-hidden] .leaflet-control-scale,
 .split-container[data-map-ui-hidden] .measure-panel,
 .split-container[data-map-ui-hidden] .shape-hint {
   display: none;
@@ -349,4 +349,69 @@ html, body, #root {
   padding: 8px 10px;
   border-radius: var(--mantine-radius-sm);
   background: var(--mantine-color-yellow-light);
+}
+
+/* Leaflet's own controls (zoom, scale bars, map credits), restyled to match
+   the app's map overlays (.data-card, .measure-panel): dark glass, thin
+   Mantine border, rounded, the app's font. The credits are styled, never
+   hidden or shrunk past readable: the tile licences require them. */
+.map-pane .leaflet-control-zoom.leaflet-bar {
+  border: 1px solid var(--mantine-color-dark-4);
+  border-radius: var(--mantine-radius-md);
+  box-shadow: var(--mantine-shadow-md);
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+}
+.map-pane .leaflet-control-zoom a {
+  width: 32px;
+  height: 32px;
+  line-height: 30px;
+  background: rgba(36, 36, 36, 0.88);
+  color: var(--mantine-color-gray-3);
+  border-bottom: 1px solid var(--mantine-color-dark-4);
+  font: 500 18px/30px var(--mantine-font-family);
+}
+.map-pane .leaflet-control-zoom a:last-child {
+  border-bottom: none;
+}
+.map-pane .leaflet-control-zoom a:hover {
+  background: var(--mantine-color-dark-5);
+  color: var(--mantine-color-white);
+}
+.map-pane .leaflet-control-zoom a.leaflet-disabled {
+  background: rgba(36, 36, 36, 0.88);
+  color: var(--mantine-color-dark-3);
+}
+
+.map-pane .leaflet-control-scale-line {
+  background: rgba(36, 36, 36, 0.8);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--mantine-color-gray-5);
+  border-top: none;
+  color: var(--mantine-color-gray-3);
+  font: 500 11px/1.5 var(--mantine-font-family);
+  padding: 0 6px;
+  text-shadow: none;
+}
+.map-pane .leaflet-control-scale-line:not(:first-child) {
+  border-top: 1px solid var(--mantine-color-gray-5);
+  border-bottom: none;
+  margin-top: -1px;
+}
+
+.map-pane .leaflet-control-attribution {
+  background: rgba(36, 36, 36, 0.8) !important;
+  backdrop-filter: blur(6px);
+  color: var(--mantine-color-gray-5);
+  font: 11px/1.6 var(--mantine-font-family);
+  padding: 0 8px;
+  border-top-left-radius: var(--mantine-radius-sm);
+}
+.map-pane--left .leaflet-control-attribution,
+.map-pane .leaflet-left .leaflet-control-attribution {
+  border-top-left-radius: 0;
+  border-top-right-radius: var(--mantine-radius-sm);
+}
+.map-pane .leaflet-control-attribution a {
+  color: var(--mantine-color-blue-4);
 }
