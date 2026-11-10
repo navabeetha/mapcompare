@@ -155,6 +155,9 @@ export default function App({ mode, initialProjectId }: AppProps) {
   const [gridVisible, setGridVisible] = useState(false);
   /** Place-name labels on both maps (Layers menu). Saved with a project. */
   const [labelsVisible, setLabelsVisible] = useState(true);
+  // Annotations (shapes now, notes later): a viewing switch, not saved with a
+  // comparison, so hiding them never hides an author's shapes from readers.
+  const [annotationsVisible, setAnnotationsVisible] = useState(true);
   /** Hides the on-map controls (search, city cards, zoom) for a clean view.
    *  Not saved: it's a viewing preference, not part of a comparison. */
   const [mapUiHidden, setMapUiHidden] = useState(false);
@@ -553,7 +556,8 @@ export default function App({ mode, initialProjectId }: AppProps) {
 
   const areaRatio = ratioOf(leftTotals.areaM2, rightTotals.areaM2);
   const lengthRatio = ratioOf(leftTotals.lengthM, rightTotals.lengthM);
-  const hasShapes = leftShapes.length > 0 || rightShapes.length > 0;
+  // Shape controls and totals only while the shapes themselves are showing.
+  const hasShapes = annotationsVisible && (leftShapes.length > 0 || rightShapes.length > 0);
 
   // Delete removes the selected shape. Ignored while typing in a search box so
   // it can't eat a backspace mid-query.
@@ -959,6 +963,14 @@ export default function App({ mode, initialProjectId }: AppProps) {
                 onMapStyleChange={setMapStyle}
                 borders={borders}
                 onBordersChange={setBorders}
+                annotationsVisible={annotationsVisible}
+                onAnnotationsVisibleChange={(on) => {
+                  setAnnotationsVisible(on);
+                  if (!on) {
+                    setShapeMode('off');
+                    setSelected(null);
+                  }
+                }}
               />
               {/* Yellow while hidden, so it's obvious the controls are tucked away. */}
               <Tooltip label={mapUiHidden ? 'Show map controls' : 'Hide map controls'} withArrow>
@@ -988,9 +1000,11 @@ export default function App({ mode, initialProjectId }: AppProps) {
                     <ActionIcon
                       size="lg"
                       variant={shapeMode === mode ? 'filled' : 'default'}
-                      onClick={() =>
-                        setShapeMode((current) => (current === mode ? 'off' : mode))
-                      }
+                      onClick={() => {
+                        // Picking a drawing tool shows annotations again.
+                        setAnnotationsVisible(true);
+                        setShapeMode((current) => (current === mode ? 'off' : mode));
+                      }}
                       aria-label={label}
                       aria-pressed={shapeMode === mode}
                     >
@@ -1078,6 +1092,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               showControls
               shapeMode={shapeMode}
               shapes={leftShapes}
+              shapesVisible={annotationsVisible}
               selectedShapeId={selected?.side === 'left' ? selected.id : null}
               query={leftQuery}
               onQueryChange={setLeftQuery}
@@ -1105,6 +1120,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               showControls
               shapeMode={shapeMode}
               shapes={rightShapes}
+              shapesVisible={annotationsVisible}
               selectedShapeId={selected?.side === 'right' ? selected.id : null}
               query={rightQuery}
               onQueryChange={setRightQuery}

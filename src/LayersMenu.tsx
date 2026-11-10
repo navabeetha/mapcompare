@@ -34,6 +34,9 @@ interface Props {
   /** Border groups on. Empty means the Borders switch is off. */
   borders: BorderLevel[];
   onBordersChange: (levels: BorderLevel[]) => void;
+  /** Shapes (and notes, when they exist) drawn on the maps. */
+  annotationsVisible: boolean;
+  onAnnotationsVisibleChange: (on: boolean) => void;
 }
 
 const BORDER_NAMES: Record<BorderLevel, string> = {
@@ -92,6 +95,16 @@ export function LayersMenu(p: Props) {
             onChange={(v) => p.onMapStyleChange(v as MapStyle)}
             data={(['satellite', 'roadmap'] as const).map((v) => ({ value: v, label: STYLE_LABELS[v] }))}
             aria-label="Map view"
+          />
+          <Divider />
+          <Switch
+            size="sm"
+            labelPosition="left"
+            styles={ROW}
+            checked={p.annotationsVisible}
+            onChange={(e) => p.onAnnotationsVisibleChange(e.currentTarget.checked)}
+            label="Annotations"
+            description="Shapes and measurements drawn on the maps."
           />
           <Divider />
           <Switch

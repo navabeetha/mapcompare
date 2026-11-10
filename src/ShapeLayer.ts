@@ -69,6 +69,8 @@ export class ShapeLayer {
    * is set — see refreshHandles.
    */
   private dragging = false;
+  /** False while the Annotations switch is off (see setVisible). */
+  private visible = true;
 
   constructor(map: L.Map, opts: ShapeLayerOptions) {
     this.map = map;
@@ -102,6 +104,23 @@ export class ShapeLayer {
    * input. The drawing kinds arm the draw gesture; 'edit' allows selection and
    * handle dragging only.
    */
+  /**
+   * The Layers menu's Annotations switch. Hidden means off the map entirely:
+   * no shapes, handles or half-drawn shape, and map clicks don't draw.
+   */
+  setVisible(on: boolean): void {
+    if (this.visible === on) return;
+    this.visible = on;
+    const groups = [this.group, this.handleGroup, this.draftGroup];
+    if (on) {
+      groups.forEach((g) => g.addTo(this.map));
+    } else {
+      this.cancelDraft();
+      this.select(null);
+      groups.forEach((g) => this.map.removeLayer(g));
+    }
+  }
+
   setMode(mode: ShapeMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
@@ -388,7 +407,7 @@ export class ShapeLayer {
   // -------------------------------------------------------------- drawing
 
   private onMapClick = (e: L.LeafletMouseEvent) => {
-    if (this.mode === 'off') return;
+    if (this.mode === 'off' || !this.visible) return;
     if (this.mode === 'edit') {
       // A click that reaches the map rather than a shape means empty space.
       this.select(null);
@@ -430,7 +449,7 @@ export class ShapeLayer {
   };
 
   private onMapDblClick = (e: L.LeafletMouseEvent) => {
-    if (this.mode !== 'line' && this.mode !== 'polygon') return;
+    if (!this.visible || (this.mode !== 'line' && this.mode !== 'polygon')) return;
     L.DomEvent.stop(e);
     // The two clicks that make up this double-click already pushed a vertex at
     // (or within a pixel or two of) this spot — drop it before finishing.

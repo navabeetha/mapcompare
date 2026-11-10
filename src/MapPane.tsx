@@ -42,6 +42,8 @@ interface MapPaneProps {
   /** Shows the per-pane search and tile-style picker. */
   showControls: boolean;
   shapes: MeasureShape[];
+  /** The Layers menu's Annotations switch: false hides every shape. */
+  shapesVisible: boolean;
   selectedShapeId: string | null;
   query: string;
   onQueryChange: (query: string) => void;
@@ -128,6 +130,7 @@ export function MapPane({
   shapeMode,
   showControls,
   shapes,
+  shapesVisible,
   selectedShapeId,
   query,
   onQueryChange,
@@ -367,6 +370,10 @@ export function MapPane({
   useEffect(() => {
     shapeLayerRef.current?.setMode(shapeMode);
   }, [shapeMode]);
+
+  useEffect(() => {
+    shapeLayerRef.current?.setVisible(shapesVisible);
+  }, [shapesVisible]);
 
   useEffect(() => {
     shapeLayerRef.current?.select(selectedShapeId);
