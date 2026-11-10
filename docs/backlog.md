@@ -54,7 +54,9 @@ Playwright.
 ## To confirm in real use
 
 Small checks that haven't happened yet, not features:
-- A "Save and update Explore" commit from the live site.
-- Share → Copy image and Copy link, clicked for real (testing has stayed
-  off the clipboard).
-- A `#v=` view link opened on a phone.
+- The phone notice on a real phone: Copy link and Share, and "Continue
+  anyway".
+
+Confirmed by Neela on 2026-11-10: Copy link, Copy image, a view link on a
+phone (it worked but was unusable, hence the phone notice) and "Save and
+update Explore" from the live site.

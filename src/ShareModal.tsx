@@ -10,9 +10,11 @@ import { fileSize, imageInfo, type ImageFormat } from './exportLayout';
  *   - Image: a preview (exportImage.ts) with Copy image and a Download menu
  *     offering PNG (lossless, large) or JPEG (much smaller), each with its
  *     size. Both come from the same render as the preview, not a second one.
- *   - Link: a link to exactly what's on screen, with the whole view packed
- *     into it (viewLink.ts, `#v=`). For a comparison in Explore there's also
- *     its short link (`?project=<id>`), which opens it as published.
+ *   - Link. For an Explore comparison nobody has changed: its short link
+ *     (`?project=<id>`). Once the view differs from it (viewDiffers), a
+ *     switch offers "Edited view" (the screen, packed into a `#v=` link,
+ *     viewLink.ts) or "Default view" (the short link). Any other view: just
+ *     the `#v=` link to what's on screen.
  * Later sections (embed code, more formats) slot in below.
  *
  * The image is made each time the modal opens, from the maps as they are
@@ -25,7 +27,7 @@ interface Props {
   /** Makes the image of the comparison on screen. */
   render: () => Promise<RenderedImage>;
   /** Makes a link to exactly what's on screen. */
-  makeViewLink: () => Promise<string>;
+  makeViewLink: () => Promise<{ url: string; edited: boolean }>;
   /** The open comparison's public link, if it's in Explore. */
   link: { url: string; title: string } | null;
 }
@@ -40,8 +42,8 @@ const FORMATS: { format: ImageFormat; label: string; hint: string }[] = [
 const canCopyImage = typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
 
 export function ShareModal({ opened, onClose, render, makeViewLink, link }: Props) {
-  const [viewUrl, setViewUrl] = useState<string | null>(null);
-  const [linkKind, setLinkKind] = useState<'view' | 'explore'>('view');
+  const [made, setMade] = useState<{ url: string; edited: boolean } | null>(null);
+  const [linkKind, setLinkKind] = useState<'edited' | 'default'>('edited');
   const [image, setImage] = useState<RenderedImage | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,9 +71,9 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
   // The view link is made fresh each time, from the maps as they are now.
   useEffect(() => {
     if (!opened) return;
-    setViewUrl(null);
-    setLinkKind('view');
-    makeViewLink().then(setViewUrl, () => setViewUrl(null));
+    setMade(null);
+    setLinkKind('edited');
+    makeViewLink().then(setMade, () => setMade(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened]);
 
@@ -91,7 +93,11 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
     if (!opened) setUrl(null);
   }, [opened]);
 
-  const shownUrl = linkKind === 'explore' && link ? link.url : viewUrl;
+  // Which link shows: the published one when the view is unchanged or the
+  // author picked "Default view"; otherwise the link to the screen.
+  const showSwitch = !!link && !!made?.edited;
+  const usePublished = !!link && (!made?.edited || linkKind === 'default');
+  const shownUrl = usePublished ? link!.url : made?.url ?? null;
 
   async function copyLink() {
     if (!shownUrl) return;
@@ -99,7 +105,7 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
       await navigator.clipboard.writeText(shownUrl);
       notifications.show({
         title: 'Link copied',
-        message: linkKind === 'explore' && link ? `Opens "${link.title}" on MapCompare.` : 'Opens this view on MapCompare.',
+        message: usePublished ? `Opens "${link!.title}" on MapCompare.` : 'Opens this view on MapCompare.',
         color: 'blue',
       });
     } catch {
@@ -188,14 +194,14 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
           Link
         </Text>
-        {link && (
+        {showSwitch && (
           <SegmentedControl
             size="xs"
             value={linkKind}
-            onChange={(v) => setLinkKind(v as 'view' | 'explore')}
+            onChange={(v) => setLinkKind(v as 'edited' | 'default')}
             data={[
-              { value: 'view', label: 'This view' },
-              { value: 'explore', label: 'Explore comparison' },
+              { value: 'edited', label: 'Edited view' },
+              { value: 'default', label: 'Default view' },
             ]}
           />
         )}
@@ -214,9 +220,15 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
           </Button>
         </Group>
         <Text size="xs" c="dimmed">
-          {linkKind === 'explore' && link
-            ? `Opens “${link.title}” as it’s saved in Explore, so changes you’ve made since opening it aren’t included.`
-            : 'Opens exactly what’s on screen: both maps, the split, layers and shapes. The view is stored in the link itself, so it’s long but needs no account.'}
+          {!made
+            ? ' '
+            : usePublished
+              ? showSwitch
+                ? `Opens “${link!.title}” as published in Explore, without your changes.`
+                : `Opens “${link!.title}” as published in Explore.`
+              : showSwitch
+                ? 'Opens the view with your changes: the maps as they are now, the split, layers and shapes.'
+                : 'Opens exactly what’s on screen: both maps, the split, layers and shapes.'}
         </Text>
       </Stack>
     </Modal>

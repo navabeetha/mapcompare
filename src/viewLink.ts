@@ -15,6 +15,7 @@
  * anyone can hand-craft a link. Anything odd opens nothing (null), never throws.
  */
 import { SITE } from './exportLayout';
+import { metersPerPixel } from './altitude';
 import { createProjectId, migrateProject, type PaneState, type Project } from './projects';
 
 const VERSION = '1';
@@ -60,6 +61,48 @@ export function viewLink(code: string): string {
 export function readViewHash(hash: string): string | null {
   const match = /^#v=(.+)$/.exec(hash);
   return match ? match[1] : null;
+}
+
+/** How far a map can sit from where it was and still count as unmoved. */
+const SAME_PX = 3;
+
+/**
+ * Has the view on screen moved away from the comparison it was opened from?
+ * The Share modal uses this to offer "Edited view" and "Default view" only
+ * when they'd be different.
+ *
+ * `current` is the screen captured with the published comparison's pins, so
+ * a pinned map is compared by the place under its pin: that's what loading
+ * keeps fixed on every screen size, while the centre moves with the window.
+ * Loading on a different screen also leaves sub-pixel noise, hence SAME_PX.
+ * The right map's zoom isn't compared: it's always derived from the left's.
+ */
+export function viewDiffers(published: Project, current: Project): boolean {
+  if (Math.abs(published.splitPct - current.splitPct) > 0.5) return true;
+  if (Math.abs(published.left.zoom - current.left.zoom) > 0.01) return true;
+  if (published.left.style !== current.left.style) return true;
+  if ((published.labels ?? true) !== (current.labels ?? true)) return true;
+  if (published.grid.visible !== current.grid.visible) return true;
+  if (published.grid.overrideMeters !== current.grid.overrideMeters) return true;
+  const borders = (p: Project) => [...(p.borders ?? [])].sort().join();
+  if (borders(published) !== borders(current)) return true;
+  for (const side of ['left', 'right'] as const) {
+    const a = published[side];
+    const b = current[side];
+    const placeA = a.pin ?? a;
+    const placeB = b.pin ?? b;
+    const mpp = metersPerPixel(b.zoom, placeB.lat);
+    const dy = (placeA.lat - placeB.lat) * 111_320;
+    const dx = (placeA.lng - placeB.lng) * 111_320 * Math.cos((placeB.lat * Math.PI) / 180);
+    if (Math.hypot(dx, dy) / mpp > SAME_PX) return true;
+    if (shapesKey(a.shapes) !== shapesKey(b.shapes)) return true;
+  }
+  return false;
+}
+
+/** Shapes as comparable text, rounded like a link so float noise doesn't count. */
+function shapesKey(shapes: PaneState['shapes']): string {
+  return JSON.stringify(shapes, (_k, v) => (typeof v === 'number' ? Math.round(v * 1e6) / 1e6 : v));
 }
 
 // ------------------------------------------------------------ checks

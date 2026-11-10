@@ -122,11 +122,13 @@ Explore (`draftNameClash`).
 
 Header → Share (both modes) opens `ShareModal.tsx`: a preview of the PNG with
 Copy image (PNG) and a Download menu: PNG or JPEG (quality 0.9), both encoded
-from the same render as the preview, sizes shown. Then a Link section:
-"This view" links to exactly what's on screen, with the whole view packed
+from the same render as the preview, sizes shown. Then a Link section. An
+untouched Explore comparison gets its short `?project=<id>` link; once the
+screen differs from it (`viewDiffers`: a few px of slack, pinned maps
+compared by the place under the pin) a switch offers "Edited view" or
+"Default view". Any other view gets the link to exactly what's on screen, with the whole view packed
 into the URL hash (`#v=1.<code>`, `viewLink.ts`: rounded JSON, deflate,
-base64url; the hash never reaches a server). A comparison in Explore can
-also share its short `?project=<id>` link. Opening a `#v=` link at startup
+base64url; the hash never reaches a server). Opening a `#v=` link at startup
 (`resolveViewCode` in `mode.ts`) wins over `?project=`; decoded views go
 through `migrateProject` plus type checks and a 256 KB unpack cap, since
 anyone can craft one. Keep old `#v=` versions decodable once shared. Later
@@ -137,6 +139,13 @@ footer (`exportLayout.ts`) with the title, both scale bars and the **map
 credits, which must stay** (OSM licence, Esri terms). Reading pixels needs
 CORS: the Esri layer has `crossOrigin: 'anonymous'`; don't remove it. A
 MapLibre (WebGL) canvas is read inside its own `render` event.
+
+## Phones
+
+Phone-sized screens (shorter side under 500 px, `smallScreen.ts`) get
+`PhoneNotice` instead of the app: "Best viewed on a larger screen", the
+page's link with Copy and Share, and "Continue anyway". The app isn't
+mounted behind it, so no tiles load. Tablets get the full app.
 
 ## Backlog
 

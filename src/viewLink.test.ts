@@ -103,3 +103,58 @@ describe('viewLink / readViewHash', () => {
     expect(readViewHash('#other')).toBeNull();
   });
 });
+
+import { viewDiffers } from './viewLink';
+
+describe('viewDiffers: has the view on screen moved away from the published comparison?', () => {
+  const base = explore[0];
+  const same = (): Project => JSON.parse(JSON.stringify(base));
+
+  it('an untouched view is the same', () => {
+    expect(viewDiffers(base, same())).toBe(false);
+  });
+
+  it('ignores sub-pixel noise from loading on another screen', () => {
+    const p = same();
+    p.left.lat += 1e-7;
+    p.left.zoom += 0.001;
+    p.splitPct += 0.1;
+    expect(viewDiffers(base, p)).toBe(false);
+  });
+
+  it('notices a pan of either map', () => {
+    const p = same();
+    p.right.lng += 0.01; // hundreds of metres: many pixels at city zoom
+    expect(viewDiffers(base, p)).toBe(true);
+  });
+
+  it('notices zoom, split, layers, grid and shapes', () => {
+    const tweaks: ((p: Project) => void)[] = [
+      (p) => (p.left.zoom += 0.5),
+      (p) => (p.splitPct += 10),
+      (p) => (p.labels = !(base.labels ?? true)),
+      (p) => (p.left.style = p.left.style === 'satellite' ? 'roadmap' : 'satellite'),
+      (p) => (p.grid = { ...p.grid, visible: !p.grid.visible }),
+      (p) => (p.borders = (p.borders ?? []).includes('cities') ? [] : ['cities']),
+      (p) => p.left.shapes.push({ id: 'n', kind: 'line', points: [[1, 2], [3, 4]] }),
+    ];
+    for (const tweak of tweaks) {
+      const p = same();
+      tweak(p);
+      expect(viewDiffers(base, p)).toBe(true);
+    }
+  });
+
+  it('compares a pinned map by the place under its pin, not its centre', () => {
+    const pinned: Project = {
+      ...same(),
+      left: { ...same().left, pin: { x: 'right', y: 'middle', lat: 52.37, lng: 4.9 } },
+    };
+    // Another screen size: the centre differs, but the pinned place is where it was.
+    const elsewhere: Project = JSON.parse(JSON.stringify(pinned));
+    elsewhere.left.lat += 0.02;
+    expect(viewDiffers(pinned, elsewhere)).toBe(false);
+    elsewhere.left.pin!.lng += 0.01;
+    expect(viewDiffers(pinned, elsewhere)).toBe(true);
+  });
+});

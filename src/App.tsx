@@ -70,7 +70,7 @@ import { toMapStyle, type MapStyle } from './tileLayers';
 import { renderComparison } from './exportImage';
 import { ShareModal } from './ShareModal';
 import { exportTitle, shareLink } from './exportLayout';
-import { decodeView, encodeView, viewLink } from './viewLink';
+import { decodeView, encodeView, viewDiffers, viewLink } from './viewLink';
 import { fetchPublished, getToken, publishItem, PublishError, savePublished } from './publish';
 import { ALL_BORDER_LEVELS, type BorderLevel } from './vectorStyle';
 
@@ -874,9 +874,10 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
   /**
    * A link to exactly what's on screen (viewLink.ts). The open comparison's
    * pins are kept, so the framing holds on other screen sizes; otherwise each
-   * map is centred.
+   * map is centred. `edited` says whether the screen has moved away from the
+   * Explore comparison it was opened from (always true for any other view).
    */
-  async function makeViewLink(): Promise<string> {
+  async function makeViewLink(): Promise<{ url: string; edited: boolean }> {
     const project = captureProject(
       exportTitle(openProject?.title, leftCity.name, rightCity.name),
       { left: openProject?.left.pin ?? CENTRE_PIN, right: openProject?.right.pin ?? CENTRE_PIN },
@@ -884,7 +885,8 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
       0
     );
     if (!project) throw new Error('The maps are still loading.');
-    return viewLink(await encodeView(project));
+    const edited = openFromExplore ? viewDiffers(openFromExplore, project) : true;
+    return { url: viewLink(await encodeView(project)), edited };
   }
 
   function renderShareImage() {
