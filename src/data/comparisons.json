@@ -304,12 +304,14 @@
   {
     "schemaVersion": 2,
     "id": "ac8a776a-2f31-4fd0-9fe1-3ccfb70c1280",
-    "title": "nicobar vs mumbai",
+    "title": "Nicobar vs Mumbai",
     "splitPct": 50,
     "grid": {
       "visible": false,
       "overrideMeters": null
     },
+    "labels": true,
+    "borders": [],
     "left": {
       "city": {
         "name": "Nicobar",
@@ -321,11 +323,32 @@
         "population": 0,
         "curio": "Nicobar, Andaman and Nicobar Islands, India"
       },
-      "lat": 7.062430827475277,
-      "lng": 93.56517860518683,
-      "zoom": 10.75,
+      "lat": 6.99384796270765,
+      "lng": 94.00056971368164,
+      "zoom": 10.906620192070001,
       "style": "satellite",
-      "shapes": []
+      "shapes": [
+        {
+          "id": "6ab4cf14-37c3-453e-ab23-2bd2cf93e5f2",
+          "kind": "line",
+          "points": [
+            [
+              7.239545187100012,
+              93.84013925648202
+            ],
+            [
+              6.756023680829356,
+              93.83427878315965
+            ]
+          ]
+        }
+      ],
+      "pin": {
+        "x": "right",
+        "y": "middle",
+        "lat": 6.99384796270765,
+        "lng": 93.90826725885445
+      }
     },
     "right": {
       "city": {
@@ -338,11 +361,32 @@
         "population": 0,
         "curio": "Mumbai, Mumbai Suburban District, Maharashtra, 400051, India"
       },
-      "lat": 19.17450759895721,
-      "lng": 73.1470027021879,
-      "zoom": 10.75,
+      "lat": 19.1004808126234,
+      "lng": 72.7469305126232,
+      "zoom": 10.835718597579705,
       "style": "satellite",
-      "shapes": []
+      "shapes": [
+        {
+          "id": "13712b1b-86e0-4d65-8617-0dfb8b8ad155",
+          "kind": "line",
+          "points": [
+            [
+              19.319918393778153,
+              72.84849927117463
+            ],
+            [
+              18.891672339991885,
+              72.80925679627974
+            ]
+          ]
+        }
+      ],
+      "pin": {
+        "x": "left",
+        "y": "middle",
+        "lat": 19.1004808126234,
+        "lng": 72.8438825094223
+      }
     },
     "createdAt": 1779818384125
   }
