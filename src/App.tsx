@@ -437,6 +437,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
     setSelected({ side: toSide, id: copy.id });
   }, [selected, leftShapes, rightShapes]);
 
+  const readySyncFrameRef = useRef<number | null>(null);
   const handleReady = useCallback(
     (handle: MapPaneHandle) => {
       if (handle.side === 'left') {
@@ -448,8 +449,26 @@ export default function App({ mode, initialProjectId }: AppProps) {
       } else {
         rightMapRef.current = handle.map;
       }
+
+      // Once both maps exist, scale-match them: the right map takes the zoom
+      // that shows the left map's metres-per-pixel at its own latitude (the
+      // same rule as every zoom sync). Without this, each opened at its preset
+      // city's zoom and stayed ~25% off until the first interaction. A
+      // comparison loaded at start-up re-frames afterwards with the same rule.
+      // Deferred a frame and read from the refs then: in dev, StrictMode
+      // creates, removes and re-creates each map, so a map handed to us here
+      // may already be gone by the time the other side reports in.
+      if (readySyncFrameRef.current != null) return;
+      readySyncFrameRef.current = requestAnimationFrame(() => {
+        readySyncFrameRef.current = null;
+        const left = leftMapRef.current;
+        const right = rightMapRef.current;
+        if (!left || !right) return;
+        const centre = right.getCenter();
+        applyView('right', centre, compensatedZoom(left.getZoom(), left.getCenter().lat, centre.lat));
+      });
     },
-    [recomputeGrid]
+    [recomputeGrid, applyView]
   );
 
   const handleInteraction = useCallback((side: Side, interacting: boolean) => {

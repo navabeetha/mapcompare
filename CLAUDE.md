@@ -137,5 +137,3 @@ MapLibre (WebGL) canvas is read inside its own `render` event.
   layer (`vectorStyle.ts`) draws admin levels 3–8 only, and never admin_level 2,
   disputed, `claimed_by` or maritime lines. The Map view also strips all of
   Liberty's own boundary layers. Tests pin this; don't relax it.
-- **First load is not scale-matched** in tool mode — both cities open at their
-  preset zoom until you interact. A sync in `handleReady` would close it.
