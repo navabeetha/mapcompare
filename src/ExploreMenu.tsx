@@ -6,7 +6,6 @@ import {
   Stack,
   Text,
   UnstyledButton,
-  Group,
 } from '@mantine/core';
 import { LuGlobe } from 'react-icons/lu';
 import { displayTitle, type Project } from './projects';
@@ -14,19 +13,15 @@ import { displayTitle, type Project } from './projects';
 interface Props {
   isAuthor: boolean;
   curatedViews: Project[];
-  draftViews: Project[];
   onLoad: (id: string) => void;
-  onDeleteDraft: (id: string) => void;
-  /** Opens Manage Explore (author only). */
+  /** Opens Manage Explore (author only), which is also where drafts live. */
   onManage: () => void;
 }
 
 export function ExploreMenu({
   isAuthor,
   curatedViews,
-  draftViews,
   onLoad,
-  onDeleteDraft,
   onManage,
 }: Props) {
   const [opened, setOpened] = useState(false);
@@ -62,11 +57,6 @@ export function ExploreMenu({
         <ScrollArea.Autosize mah={360} type="hover">
           <Stack gap="md">
             <div>
-              {isAuthor && (
-                <Text size="xs" c="dimmed" tt="uppercase" mb="xs">
-                  Featured
-                </Text>
-              )}
               {curatedViews.length === 0 ? (
                 <Text size="sm" c="dimmed">
                   No comparisons yet.
@@ -90,45 +80,7 @@ export function ExploreMenu({
 
             {isAuthor && (
               <div>
-                <Text size="xs" c="dimmed" tt="uppercase" mb="xs">
-                  Drafts (local only)
-                </Text>
-                {draftViews.length === 0 ? (
-                  <Text size="sm" c="dimmed">
-                    No drafts saved yet.
-                  </Text>
-                ) : (
-                  <Stack gap={2}>
-                    {draftViews.map((v) => (
-                      <UnstyledButton
-                        key={v.id}
-                        onClick={() => handleLoadAndClose(v.id)}
-                        className="explore-row"
-                      >
-                        <Group justify="space-between" wrap="nowrap">
-                          <Text size="sm" >
-                            {displayTitle(v.title)}
-                          </Text>
-                          <Text
-                            component="span"
-                            size="sm"
-                            c="dimmed"
-                            title="Delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteDraft(v.id);
-                            }}
-                            style={{ cursor: 'pointer', padding: '0 4px' }}
-                          >
-                            ×
-                          </Text>
-                        </Group>
-                      </UnstyledButton>
-                    ))}
-                  </Stack>
-                )}
                 <Button
-                  mt="md"
                   variant="default"
                   size="xs"
                   fullWidth

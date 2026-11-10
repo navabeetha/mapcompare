@@ -750,7 +750,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
 
       notifications.show({
         title: 'Draft saved',
-        message: `"${title}" added to your drafts.`,
+        message: `"${title}" added to your drafts (Menu → Manage Explore).`,
         color: 'green',
       });
     } catch (err) {
@@ -845,23 +845,6 @@ export default function App({ mode, initialProjectId }: AppProps) {
     }
   }
 
-  function handleDeleteView(id: string) {
-    const next = projects.filter((p) => p.id !== id);
-    setProjects(next);
-    try {
-      persistProjects(next);
-    } catch (err) {
-      notifications.show({
-        title: 'Delete failed',
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Could not update local storage.',
-        color: 'red',
-      });
-    }
-  }
-
   return (
     <AppShell header={{ height: HEADER_HEIGHT, collapsed: fullscreen }} padding={0}>
       <AppShell.Header className="app-header">
@@ -909,9 +892,7 @@ export default function App({ mode, initialProjectId }: AppProps) {
               <ExploreMenu
                 isAuthor={isAuthor}
                 curatedViews={published}
-                draftViews={projects}
                 onLoad={handleLoadView}
-                onDeleteDraft={handleDeleteView}
                 onManage={openManage}
               />
               <LayersMenu
