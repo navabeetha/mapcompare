@@ -103,7 +103,7 @@ before `zoomSnap: 0` land exactly scale-matched.
 ## Publishing (Manage Explore)
 
 The Explore list is `src/data/comparisons.json`, imported at build time. The
-author edits it from Menu → Manage Explore (tool mode only): changes collect
+author edits it from Explore → Manage Explore (tool mode only): changes collect
 in the modal and go out as **one commit** through the GitHub contents API
 (`src/publish.ts`), which starts the Pages deploy (live in ~1–2 minutes). The
 author's fine-grained token (Contents read/write on this repo only) lives in
@@ -114,7 +114,7 @@ Hiding the screen in view mode is not the guard; the token is.
 
 A comparison is **either a draft or in Explore, never both** (`pruneDrafts`
 runs after each load and publish). To change an Explore comparison: open it
-(play), edit, then Save view → "Save and update Explore" (publishes that one
+(play), edit, then the header's Save → "Save and update Explore" (publishes that one
 comparison at once, same id) or "Save to drafts", which needs a name not in
 Explore (`draftNameClash`).
 
@@ -139,6 +139,15 @@ footer (`exportLayout.ts`) with the title, both scale bars and the **map
 credits, which must stay** (OSM licence, Esri terms). Reading pixels needs
 CORS: the Esri layer has `crossOrigin: 'anonymous'`; don't remove it. A
 MapLibre (WebGL) canvas is read inside its own `render` event.
+
+## Header
+
+Left to right: Menu (About only), logo, Explore (Manage Explore at the top
+of its list, author only) | View: Layers, hide controls | Draw: shape tools
+| Save (author only). Save is disabled until the screen differs from what
+was last opened or saved (`savable` in App: `viewDiffers` against
+`openProject`, or the default view as it first settled). Map moves reach
+it through `handleInteraction`, which re-renders at the end of each move.
 
 ## Phones
 

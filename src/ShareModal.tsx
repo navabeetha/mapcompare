@@ -124,7 +124,16 @@ export function ShareModal({ opened, onClose, render, makeViewLink, link }: Prop
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} title={<Text fw={700}>Share</Text>} size={880} centered>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={<Text fw={700}>Share</Text>}
+      size={880}
+      centered
+      // The header stays put while the body scrolls (Mantine's sticky
+      // header); the line makes that edge visible on short windows.
+      styles={{ header: { borderBottom: '1px solid var(--mantine-color-dark-4)', marginBottom: 'var(--mantine-spacing-sm)' } }}
+    >
       <Stack gap="sm">
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
           Image

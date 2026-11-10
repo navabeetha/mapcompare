@@ -52,7 +52,7 @@ import {
  * GitHub, and the moves between them.
  *
  * A comparison is either a draft or in Explore, never both. To change one in
- * Explore, open it (play), edit it on the maps, then Menu → Save view → "Save
+ * Explore, open it (play), edit it on the maps, then the header's Save → "Save
  * and update Explore" (or "Save to drafts" under a new name).
  *
  * Changes to the published list are collected here first and go out together
@@ -300,7 +300,7 @@ export function ManageExploreModal(p: Props) {
               <Stack gap={2}>
                 {draftsShown.length === 0 && (
                   <Text size="sm" c="dimmed">
-                    No drafts. Set up a comparison and use Menu → Save view.
+                    No drafts. Set up a comparison and click Save in the header.
                   </Text>
                 )}
                 {draftsShown.map((item) => (

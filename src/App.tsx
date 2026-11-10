@@ -11,6 +11,7 @@ import {
   Divider,
   Menu,
   ActionIcon,
+  Button,
   Tooltip,
 } from '@mantine/core';
 import {
@@ -22,7 +23,7 @@ import {
   MdPolyline,
   MdRadioButtonUnchecked,
 } from 'react-icons/md';
-import { LuShare2, LuInfo, LuListChecks, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
+import { LuShare2, LuInfo, LuMaximize, LuMenu, LuSave, LuX } from 'react-icons/lu';
 // Lucide pair for the map-controls toggle: a wireframe with top bar and side
 // panel (controls showing) vs the same frame left empty (clean canvas).
 import { LuPanelsTopLeft, LuSquare } from 'react-icons/lu';
@@ -470,14 +471,18 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
         if (!left || !right) return;
         const centre = right.getCenter();
         applyView('right', centre, compensatedZoom(left.getZoom(), left.getCenter().lat, centre.lat));
+        setMapsReady((n) => n + 1);
       });
     },
     [recomputeGrid, applyView]
   );
 
+  const [, setViewTick] = useState(0);
   const handleInteraction = useCallback((side: Side, interacting: boolean) => {
     if (side === 'left') isUserInteractingLeft.current = interacting;
     else isUserInteractingRight.current = interacting;
+    // A move ended: re-render so the Save button re-checks for changes.
+    if (!interacting) setViewTick((t) => t + 1);
   }, []);
 
   /**
@@ -746,6 +751,31 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
   const openFromExplore = openProject ? published.find((x) => x.id === openProject.id) ?? null : null;
   const [updatingExplore, setUpdatingExplore] = useState(false);
 
+  // ---- Save button state: enabled only when something changed.
+  // The baseline is what was last opened or saved (openProject), or for a
+  // fresh session the default view as it first settled (freshBaseline).
+  // Map moves don't re-render App on their own, so the end of each move
+  // bumps viewTick (handleInteraction).
+  const [mapsReady, setMapsReady] = useState(0);
+  const [freshBaseline, setFreshBaseline] = useState<Project | null>(null);
+  useEffect(() => {
+    if (!mapsReady || !leftMapRef.current || !rightMapRef.current) return;
+    setFreshBaseline((b) => b ?? captureProject('', { left: CENTRE_PIN, right: CENTRE_PIN }, 'fresh', 0));
+    // captureProject is read once, at the first ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapsReady]);
+  const baseline = openProject ?? freshBaseline;
+  const savable = (() => {
+    if (!isAuthor || !baseline) return true;
+    const now = captureProject(
+      baseline.title,
+      { left: baseline.left.pin ?? CENTRE_PIN, right: baseline.right.pin ?? CENTRE_PIN },
+      baseline.id,
+      baseline.createdAt
+    );
+    return !now || viewDiffers(baseline, now);
+  })();
+
   function handleSaveClick() {
     const left = leftQuery.trim() || leftCity.name;
     const right = rightQuery.trim() || rightCity.name;
@@ -818,7 +848,7 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
 
       notifications.show({
         title: 'Draft saved',
-        message: `"${title}" added to your drafts (Menu → Manage Explore).`,
+        message: `"${title}" added to your drafts (Explore → Manage Explore).`,
         color: 'green',
       });
     } catch (err) {
@@ -988,8 +1018,8 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
       <AppShell.Header className="app-header">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap={0} wrap="nowrap" align="center">
-            {/* The "meta" actions (Save, About) live in this menu, so the header
-                keeps to what you use on the maps. */}
+            {/* Only About lives here now: Save is in the header and Manage
+                Explore is at the top of the Explore menu. */}
             <Menu position="bottom-start" shadow="md" width={200} withArrow>
               <Menu.Target>
                 <ActionIcon size="lg" variant="subtle" color="gray" mr={10} aria-label="Menu">
@@ -997,16 +1027,6 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                {isAuthor && (
-                  <Menu.Item leftSection={<LuSave size={16} />} onClick={handleSaveClick}>
-                    Save view…
-                  </Menu.Item>
-                )}
-                {isAuthor && (
-                  <Menu.Item leftSection={<LuListChecks size={16} />} onClick={openManage}>
-                    Manage Explore…
-                  </Menu.Item>
-                )}
                 <Menu.Item leftSection={<LuInfo size={16} />} onClick={openAbout}>
                   About MapCompare
                 </Menu.Item>
@@ -1023,6 +1043,10 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
                 onLoad={handleLoadView}
                 onManage={openManage}
               />
+              <Divider orientation="vertical" style={{ height: 24, alignSelf: 'center' }} />
+              <Text fz={12} c="dimmed" mr={-4}>
+                View
+              </Text>
               <LayersMenu
                 gridVisible={gridVisible}
                 onGridVisibleChange={setGridVisible}
@@ -1127,6 +1151,29 @@ export default function App({ mode, initialProjectId, initialViewCode }: AppProp
                   </Tooltip>
                 )}
               </Group>
+              {isAuthor && (
+                <>
+                  <Divider orientation="vertical" style={{ height: 24, alignSelf: 'center' }} />
+                  {/* Disabled until the screen differs from what was last opened
+                      or saved (see `savable`). The span lets the tooltip show
+                      on a disabled button. */}
+                  <Tooltip label={savable ? 'Save this view' : 'No changes to save'} withArrow>
+                    <span>
+                      <Button
+                        size="sm"
+                        h={34}
+                        px={12}
+                        variant="default"
+                        leftSection={<LuSave size={16} />}
+                        onClick={handleSaveClick}
+                        disabled={!savable}
+                      >
+                        Save
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </>
+              )}
             </Group>
           </Group>
           <Group gap="sm" wrap="nowrap" align="center">

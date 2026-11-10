@@ -56,6 +56,21 @@ export function ExploreMenu({
       <Popover.Dropdown p="xs">
         <ScrollArea.Autosize mah={360} type="hover">
           <Stack gap="md">
+            {/* The author's way in to drafts and publishing; first, so it's
+                found without scrolling past the list. */}
+            {isAuthor && (
+              <Button
+                variant="default"
+                size="xs"
+                fullWidth
+                onClick={() => {
+                  setOpened(false);
+                  onManage();
+                }}
+              >
+                Manage Explore…
+              </Button>
+            )}
             <div>
               {curatedViews.length === 0 ? (
                 <Text size="sm" c="dimmed">
@@ -78,21 +93,6 @@ export function ExploreMenu({
               )}
             </div>
 
-            {isAuthor && (
-              <div>
-                <Button
-                  variant="default"
-                  size="xs"
-                  fullWidth
-                  onClick={() => {
-                    setOpened(false);
-                    onManage();
-                  }}
-                >
-                  Manage Explore…
-                </Button>
-              </div>
-            )}
           </Stack>
         </ScrollArea.Autosize>
       </Popover.Dropdown>
