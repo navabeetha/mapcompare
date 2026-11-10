@@ -1,6 +1,53 @@
 [
   {
     "schemaVersion": 2,
+    "id": "1060dede-71a0-434b-a70e-1d7824cdbe29",
+    "title": "Izu Peninsula vs Te Pātaka-o-Rākaihautū / Banks Peninsula",
+    "splitPct": 50,
+    "grid": {
+      "visible": false,
+      "overrideMeters": null
+    },
+    "labels": true,
+    "borders": [],
+    "left": {
+      "city": {
+        "name": "Izu Peninsula",
+        "country": "Japan",
+        "lat": 34.917385,
+        "lng": 138.9628947,
+        "zoom": 12,
+        "areaKm2": 0,
+        "population": 0,
+        "curio": "Izu Peninsula, Shizuoka Prefecture, Japan"
+      },
+      "lat": 34.85267481602312,
+      "lng": 139.28801598365274,
+      "zoom": 10.48520159194465,
+      "style": "satellite",
+      "shapes": []
+    },
+    "right": {
+      "city": {
+        "name": "Te Pātaka-o-Rākaihautū / Banks Peninsula",
+        "country": "New Zealand",
+        "lat": -43.7233892,
+        "lng": 172.910213,
+        "zoom": 12,
+        "areaKm2": 0,
+        "population": 0,
+        "curio": "Te Pātaka-o-Rākaihautū / Banks Peninsula, Pigeon Bay, Banks Peninsula Community, Christchurch City, Canterbury, 7581, New Zealand"
+      },
+      "lat": -43.730455093552315,
+      "lng": 172.4327327166176,
+      "zoom": 10.301537401583307,
+      "style": "satellite",
+      "shapes": []
+    },
+    "createdAt": 1794329878801
+  },
+  {
+    "schemaVersion": 2,
     "id": "b70081ca-b4e7-4c03-9c74-08fc5d33bc81",
     "title": "Amsterdam vs Venice",
     "splitPct": 50,
